@@ -98,6 +98,8 @@
 
             <div class="chat-header-actions">
               <div class="header-chip live-pulse"><span class="chip-dot"></span>Live execution</div>
+              <button id="workspaceModeBtn" class="ghost-btn" data-tooltip="Toggle wider side panes for investigation workspace">Workspace mode</button>
+              <button id="togglePlanModeBtn" class="ghost-btn" data-tooltip="Show compact assistant plan panels">Plan mode</button>
               <button id="toggleTerminalBtn" class="ghost-btn" data-tooltip="Show or hide the execution console">Hide console</button>
             </div>
           </div>
@@ -200,12 +202,21 @@
         </section>
 
         <section class="terminal-shell panel-card inset-card">
-          <div class="terminal-toolbar">
-            <span class="terminal-pill live">Live</span>
-            <span class="terminal-pill subtle">Auto-follow</span>
-            <span class="terminal-pill subtle">Analyst telemetry</span>
+          <div class="activity-tabs" role="tablist" aria-label="Activity views">
+            <button id="consoleTabBtn" class="activity-tab active" type="button" data-tooltip="Live tool execution details">Execution</button>
+            <button id="artifactsTabBtn" class="activity-tab" type="button" data-tooltip="Generated artifacts from assistant responses">Artifacts</button>
           </div>
-          <div id="terminalOutput" class="terminal-output" aria-live="polite"></div>
+          <div id="consolePane" class="activity-pane active">
+            <div class="terminal-toolbar">
+              <span class="terminal-pill live">Live</span>
+              <span class="terminal-pill subtle">Auto-follow</span>
+              <span class="terminal-pill subtle">Analyst telemetry</span>
+            </div>
+            <div id="terminalOutput" class="terminal-output" aria-live="polite"></div>
+          </div>
+          <div id="artifactsPane" class="activity-pane" aria-live="polite">
+            <div id="artifactsList" class="artifacts-list"></div>
+          </div>
         </section>
       </div>
     </aside>
