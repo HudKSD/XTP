@@ -14,7 +14,7 @@ from app.agent.tracing import TraceLogger
 from app.config import load_settings
 from app.db import add_message, create_chat, delete_chat, get_chat, get_messages, init_db, list_chats, update_chat_title
 
-load_dotenv()
+load_dotenv(override=True)
 
 settings = load_settings()
 trace_logger = TraceLogger(settings.traces_dir, enabled=settings.trace_enabled)
