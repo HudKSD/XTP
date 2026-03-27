@@ -98,6 +98,8 @@
 
             <div class="chat-header-actions">
               <div class="header-chip live-pulse"><span class="chip-dot"></span>Live execution</div>
+              <button id="workspaceModeBtn" class="ghost-btn" data-tooltip="Toggle wider context panes for investigation mode">Workspace mode</button>
+              <button id="planModeBtn" class="ghost-btn" data-tooltip="Show or hide compact agent plan cards">Plan mode</button>
               <button id="toggleTerminalBtn" class="ghost-btn" data-tooltip="Show or hide the execution console">Hide console</button>
             </div>
           </div>
@@ -135,7 +137,7 @@
                 </div>
               </div>
 
-              <textarea id="composerInput" rows="1" placeholder="Ask about RBTN DB fields, time windows, trends, top values, evidence, or relationships…"></textarea>
+              <textarea id="composerInput" rows="1" placeholder="Ask about RBTN DB fields, time windows, trends, top values, evidence, or relationships…" data-tooltip="Prompt input with red-tinted focus to keep the investigation thread prominent"></textarea>
 
               <div class="composer-actions">
                 <div class="composer-meta">
@@ -200,12 +202,38 @@
         </section>
 
         <section class="terminal-shell panel-card inset-card">
-          <div class="terminal-toolbar">
-            <span class="terminal-pill live">Live</span>
-            <span class="terminal-pill subtle">Auto-follow</span>
-            <span class="terminal-pill subtle">Analyst telemetry</span>
+          <div class="pane-tabs" role="tablist" aria-label="Right pane modes">
+            <button id="consoleTabBtn" class="pane-tab active" type="button" role="tab" aria-selected="true">Console</button>
+            <button id="inspectorTabBtn" class="pane-tab" type="button" role="tab" aria-selected="false">Query Inspector</button>
+            <button id="artifactsTabBtn" class="pane-tab" type="button" role="tab" aria-selected="false">Artifacts</button>
           </div>
-          <div id="terminalOutput" class="terminal-output" aria-live="polite"></div>
+
+          <div id="consolePane" class="right-pane-mode">
+            <div class="terminal-toolbar">
+              <span class="terminal-pill live">Live</span>
+              <span class="terminal-pill subtle">Auto-follow</span>
+              <span class="terminal-pill subtle">Analyst telemetry</span>
+            </div>
+            <div id="terminalOutput" class="terminal-output" aria-live="polite"></div>
+          </div>
+
+          <div id="inspectorPane" class="right-pane-mode hidden">
+            <div class="inspector-head">
+              <span class="surface-chip subtle" data-tooltip="Shows the latest generated ES query or ES|QL statement">Latest query context</span>
+              <span id="inspectorCountPill" class="surface-chip subtle">No query yet</span>
+            </div>
+            <div id="inspectorFlags" class="inspector-flags"></div>
+            <pre id="inspectorQuery" class="inspector-query">Waiting for an Elasticsearch query...</pre>
+            <div id="inspectorTools" class="inspector-tools"></div>
+          </div>
+
+          <div id="artifactsPane" class="right-pane-mode hidden">
+            <div class="inspector-head">
+              <span class="surface-chip subtle" data-tooltip="Artifacts generated per assistant response, including exports, query snapshots, and plan summaries">Session artifacts</span>
+              <span id="artifactCountPill" class="surface-chip subtle">0 artifacts</span>
+            </div>
+            <div id="artifactList" class="artifact-list"></div>
+          </div>
         </section>
       </div>
     </aside>
@@ -219,8 +247,10 @@
           <div class="message-role"></div>
           <div class="message-meta"></div>
           <button class="message-copy ghost-icon-btn" type="button" data-tooltip="Copy message">Copy</button>
+          <button class="message-export ghost-icon-btn" type="button" data-tooltip="Export this response as Markdown">Export</button>
         </div>
         <div class="message-bubble"></div>
+        <div class="message-followups hidden"></div>
       </div>
     </article>
   </template>

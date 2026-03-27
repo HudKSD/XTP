@@ -29,10 +29,10 @@
   --radius-md: 14px;
   --radius-sm: 12px;
   --page-pad: 18px;
-  --sidebar-width: clamp(340px, 20vw, 380px);
-  --console-width: clamp(350px, 22vw, 400px);
-  --thread-max: 940px;
-  --thread-copy-max: 820px;
+  --sidebar-width: clamp(374px, 22vw, 418px);
+  --console-width: clamp(384px, 24vw, 440px);
+  --thread-max: 980px;
+  --thread-copy-max: 860px;
   --header-height: 92px;
   --transition-fast: 140ms ease;
   --transition: 220ms cubic-bezier(.2, .8, .2, 1);
@@ -61,6 +61,7 @@ body {
 
 body {
   position: relative;
+  font-size: 14px;
 }
 
 body::before {
@@ -757,7 +758,7 @@ textarea::placeholder,
   position: relative;
   z-index: 2;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: linear-gradient(180deg, rgba(16, 19, 25, 0.96), rgba(16, 19, 25, 0.82));
+  background: linear-gradient(180deg, rgba(16, 19, 25, 0.68), rgba(16, 19, 25, 0.56));
   backdrop-filter: blur(12px);
 }
 
@@ -771,7 +772,7 @@ textarea::placeholder,
   justify-content: space-between;
   align-items: flex-start;
   gap: 18px;
-  padding: 22px 0 18px;
+  padding: 14px 0 12px;
 }
 
 .chat-header-main {
@@ -788,13 +789,15 @@ textarea::placeholder,
 
 .title-row h2 {
   margin: 4px 0 0;
-  font-size: clamp(1.35rem, 1.8vw, 1.85rem);
+  font-size: clamp(1.22rem, 1.6vw, 1.62rem);
 }
 
 .subtitle {
   max-width: 74ch;
-  margin: 10px 0 0;
-  line-height: 1.55;
+  margin: 6px 0 0;
+  line-height: 1.45;
+  font-size: 12.5px;
+  opacity: 0.78;
 }
 
 .chat-header-actions {
@@ -812,7 +815,8 @@ textarea::placeholder,
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 28px 0 24px;
+  padding: 24px 0 20px;
+  background: linear-gradient(180deg, rgba(100, 22, 36, 0.07), rgba(88, 18, 29, 0.04));
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
@@ -896,7 +900,8 @@ textarea::placeholder,
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
 }
 
 .message-role {
@@ -915,14 +920,15 @@ textarea::placeholder,
 .message-bubble {
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.07);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
-  padding: 18px 18px 16px;
+  background: linear-gradient(180deg, rgba(124, 26, 44, 0.12), rgba(255, 255, 255, 0.02));
+  padding: 16px 16px 14px;
   color: var(--text-soft);
-  line-height: 1.75;
+  line-height: 1.65;
+  font-size: 13.5px;
 }
 
 .message-row.assistant .message-bubble {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.016));
+  background: linear-gradient(180deg, rgba(136, 30, 50, 0.16), rgba(255, 255, 255, 0.02));
 }
 
 .message-row.user .message-bubble {
@@ -1188,7 +1194,7 @@ textarea::placeholder,
 .composer-surface {
   padding: 16px;
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(22, 28, 36, 0.98), rgba(19, 24, 32, 0.98));
+  background: linear-gradient(180deg, rgba(42, 18, 26, 0.92), rgba(24, 16, 22, 0.94));
 }
 
 .composer-header {
@@ -1218,9 +1224,13 @@ textarea::placeholder,
   resize: none;
   border: 0;
   outline: none;
-  background: transparent;
+  background: rgba(170, 36, 64, 0.08);
+  border: 1px solid rgba(255, 126, 152, 0.18);
+  border-radius: 14px;
+  padding: 10px 12px;
   color: var(--text);
-  line-height: 1.65;
+  line-height: 1.58;
+  font-size: 13.5px;
 }
 
 .composer-actions {
@@ -1257,7 +1267,9 @@ textarea::placeholder,
 
 .activity-head p {
   margin: 8px 0 0;
-  line-height: 1.55;
+  line-height: 1.45;
+  font-size: 12.5px;
+  opacity: 0.76;
 }
 
 .activity-grid {
@@ -1293,6 +1305,168 @@ textarea::placeholder,
   min-height: 0;
   padding: 14px;
   background: linear-gradient(180deg, rgba(17, 21, 28, 0.98), rgba(12, 16, 22, 0.98));
+}
+
+.app-shell.workspace-mode {
+  --sidebar-width: clamp(402px, 24vw, 458px);
+  --console-width: clamp(412px, 26vw, 484px);
+}
+
+.ghost-btn.active,
+.pane-tab.active {
+  border-color: rgba(123, 220, 181, 0.32);
+  background: rgba(123, 220, 181, 0.12);
+  color: var(--text);
+}
+
+.pane-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.pane-tab {
+  min-height: 30px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.right-pane-mode {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.inspector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.inspector-flags,
+.message-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.result-flag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 211, 122, 0.34);
+  background: rgba(255, 211, 122, 0.1);
+  color: #ffe6bc;
+  font-size: 11px;
+}
+
+.inspector-query {
+  margin: 0 0 10px;
+  padding: 10px;
+  min-height: 84px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 13, 19, 0.9);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-soft);
+}
+
+.inspector-tools {
+  overflow: auto;
+  min-height: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.inspector-tool-row {
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+}
+
+.artifact-list {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+}
+
+.artifact-card {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.artifact-title {
+  font-weight: 620;
+  font-size: 12px;
+}
+
+.artifact-meta {
+  margin: 4px 0 10px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.message-followups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.followup-label {
+  width: 100%;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.followup-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-soft);
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
+.agent-plan {
+  margin-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.09);
+  padding-top: 8px;
+}
+
+.agent-plan summary {
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.agent-plan-body {
+  margin-top: 8px;
+  display: grid;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-muted);
 }
 
 .terminal-toolbar {

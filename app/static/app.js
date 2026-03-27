@@ -16,6 +16,12 @@ const state = {
   modalResolver: null,
   modalMode: null,
   historyFilter: "",
+  workspaceMode: false,
+  planMode: false,
+  rightPaneMode: "console",
+  pendingToolEvents: [],
+  artifacts: [],
+  lastUserPrompt: "",
   activity: {
     phase: "Idle",
     toolCount: 0,
@@ -37,7 +43,21 @@ const statusBarEl = document.getElementById("statusBar");
 const statusTextEl = document.getElementById("statusText");
 const terminalOutputEl = document.getElementById("terminalOutput");
 const toggleTerminalBtnEl = document.getElementById("toggleTerminalBtn");
+const workspaceModeBtnEl = document.getElementById("workspaceModeBtn");
+const planModeBtnEl = document.getElementById("planModeBtn");
 const clearTerminalBtnEl = document.getElementById("clearTerminalBtn");
+const consoleTabBtnEl = document.getElementById("consoleTabBtn");
+const inspectorTabBtnEl = document.getElementById("inspectorTabBtn");
+const artifactsTabBtnEl = document.getElementById("artifactsTabBtn");
+const consolePaneEl = document.getElementById("consolePane");
+const inspectorPaneEl = document.getElementById("inspectorPane");
+const artifactsPaneEl = document.getElementById("artifactsPane");
+const inspectorCountPillEl = document.getElementById("inspectorCountPill");
+const inspectorFlagsEl = document.getElementById("inspectorFlags");
+const inspectorQueryEl = document.getElementById("inspectorQuery");
+const inspectorToolsEl = document.getElementById("inspectorTools");
+const artifactListEl = document.getElementById("artifactList");
+const artifactCountPillEl = document.getElementById("artifactCountPill");
 const messageTemplate = document.getElementById("messageTemplate");
 const modelCardEl = document.getElementById("modelCard");
 const indexCardEl = document.getElementById("indexCard");
@@ -185,6 +205,135 @@ function showToast(message, kind = "info") {
     toast.style.transform = "translateY(8px)";
     setTimeout(() => toast.remove(), 200);
   }, 2600);
+}
+
+function downloadFile(filename, content, mimeType = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildFollowups(prompt = "", response = "") {
+  const focus = (prompt || "").toLowerCase();
+  const text = `${prompt}\n${response}`.toLowerCase();
+  const picks = [];
+  const push = (value) => {
+    if (value && !picks.includes(value) && picks.length < 5) picks.push(value);
+  };
+  if (text.includes("cve")) push("Can you break this down by CVE severity and affected products?");
+  if (text.includes("threat actor")) push("Which threat actors showed the largest increase over the same period?");
+  if (text.includes("malware")) push("Can you map the malware families to infrastructure and sectors?");
+  if (text.includes("infrastructure")) push("Which infrastructure indicators appear across multiple campaigns?");
+  if (text.includes("timeline") || text.includes("trend")) push("Show this as a timeline with notable spikes and likely drivers.");
+  if (focus.includes("last") || focus.includes("days") || focus.includes("month")) {
+    push("Compare this with the previous equivalent time window.");
+  }
+  push("What evidence rows most strongly support this conclusion?");
+  push("Can you validate this with an ES|QL query and show the exact query used?");
+  push("What gaps or uncertainty should we account for before acting on this?");
+  return picks.slice(0, 5);
+}
+
+function derivePlan(meta = {}) {
+  const tools = Array.isArray(meta.tools_used) ? meta.tools_used : [];
+  const steps = tools.map((tool, idx) => `${idx + 1}. ${tool.replaceAll("_", " ")}`);
+  return {
+    intent: "Investigate user question against RBTN DB with read-only Elasticsearch tools.",
+    stages: ["Interpret request", "Validate schema/fields", "Execute queries", "Synthesize evidence-backed answer"],
+    tools,
+    steps,
+  };
+}
+
+function setRightPaneMode(mode = "console") {
+  state.rightPaneMode = mode;
+  const pairs = [
+    [consoleTabBtnEl, consolePaneEl, "console"],
+    [inspectorTabBtnEl, inspectorPaneEl, "inspector"],
+    [artifactsTabBtnEl, artifactsPaneEl, "artifacts"],
+  ];
+  pairs.forEach(([tab, pane, key]) => {
+    const active = key === mode;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+    pane.classList.toggle("hidden", !active);
+  });
+}
+
+function normalizeLimitations(meta = {}, toolTrace = []) {
+  const flags = [];
+  const combined = JSON.stringify(meta || {}).toLowerCase() + JSON.stringify(toolTrace || []).toLowerCase();
+  const add = (id, label, tip) => {
+    if (!flags.find((item) => item.id === id)) flags.push({ id, label, tip });
+  };
+  if (combined.includes("sample")) add("sampled", "Sampled", "Result set appears sampled; not all matching records may be represented.");
+  if (combined.includes("truncat") || combined.includes("limit")) add("truncated", "Truncated", "Result may be clipped by size or LIMIT settings.");
+  if (combined.includes("partial")) add("partial", "Partial", "Only part of the expected result set was returned.");
+  if (combined.includes("conflict") || combined.includes("unmapped") || combined.includes("type")) {
+    add("schema", "Schema conflict", "Cross-index field mapping/type differences may have affected query behavior.");
+  }
+  return flags;
+}
+
+function updateInspector(meta = {}) {
+  const trace = Array.isArray(meta.tool_trace) ? meta.tool_trace : [];
+  const queryEntry = [...trace].reverse().find((item) => ["run_esql_query", "run_dsl_query", "validate_dsl_query"].includes(item.tool_name));
+  const queryText = queryEntry?.arguments?.query
+    || (queryEntry?.arguments?.query_body ? JSON.stringify(queryEntry.arguments.query_body, null, 2) : "");
+  inspectorCountPillEl.textContent = trace.length ? `${trace.length} tool event${trace.length === 1 ? "" : "s"}` : "No query yet";
+  inspectorQueryEl.textContent = queryText || "Waiting for an Elasticsearch query...";
+  inspectorToolsEl.innerHTML = trace.length
+    ? trace.map((item) => `<div class="inspector-tool-row"><span>${safeEscape(item.tool_name || "tool")}</span><span data-tooltip="${safeEscape(item.summary || "No summary")}">${safeEscape(item.summary || "No summary")}</span></div>`).join("")
+    : `<div class="chat-history-empty">No tool trace for this response.</div>`;
+  const flags = normalizeLimitations(meta, trace);
+  inspectorFlagsEl.innerHTML = flags.map((flag) => `<span class="result-flag" data-tooltip="${safeEscape(flag.tip)}">${safeEscape(flag.label)}</span>`).join("");
+}
+
+function renderArtifacts() {
+  artifactCountPillEl.textContent = `${state.artifacts.length} artifact${state.artifacts.length === 1 ? "" : "s"}`;
+  if (!state.artifacts.length) {
+    artifactListEl.innerHTML = `<div class="chat-history-empty">Artifacts will appear after assistant responses.</div>`;
+    return;
+  }
+  artifactListEl.innerHTML = state.artifacts.slice().reverse().map((item) => `
+    <article class="artifact-card">
+      <div class="artifact-title">${safeEscape(item.title)}</div>
+      <div class="artifact-meta">${safeEscape(item.kind)} • ${safeEscape(fmtDate(item.created_at))}</div>
+      <button class="ghost-btn small artifact-download-btn" data-artifact-id="${safeEscape(item.id)}" type="button">Download</button>
+    </article>
+  `).join("");
+  artifactListEl.querySelectorAll(".artifact-download-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = state.artifacts.find((entry) => entry.id === btn.dataset.artifactId);
+      if (!target) return;
+      downloadFile(target.filename, target.content, target.mimeType);
+      showToast(`Downloaded ${target.filename}`, "success");
+    });
+  });
+}
+
+function hydrateArtifactsFromMessages(messages = []) {
+  state.artifacts = [];
+  messages.forEach((message) => {
+    if (message.role !== "assistant") return;
+    const id = `msg-${message.id || Math.random().toString(16).slice(2)}`;
+    state.artifacts.push({
+      id,
+      title: `Assistant result • ${chatTitleEl.textContent || "chat"}`,
+      kind: "chat-export",
+      created_at: message.created_at || new Date().toISOString(),
+      filename: `artifact-${id}.json`,
+      mimeType: "application/json;charset=utf-8",
+      content: JSON.stringify({ content: message.content, meta: message.meta || {} }, null, 2),
+    });
+  });
+  renderArtifacts();
 }
 
 function getTooltipAnchor(target) {
@@ -642,7 +791,22 @@ function handleCopyMessage(node, content) {
   });
 }
 
-function decorateAssistantBubble(node, meta = {}) {
+function handleExportMessage(node, content, meta = {}) {
+  const btn = node.querySelector(".message-export");
+  if (!btn) return;
+  btn.dataset.tooltip = "Export this response as Markdown";
+  btn.classList.toggle("hidden", node.classList.contains("user"));
+  btn.addEventListener("click", () => {
+    const title = (chatTitleEl.textContent || "chat-result").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `${title || "chat-result"}-${stamp}.md`;
+    const body = `# ${chatTitleEl.textContent || "Chat result"}\n\n${content || ""}\n\n---\n\n\`\`\`json\n${JSON.stringify(meta || {}, null, 2)}\n\`\`\`\n`;
+    downloadFile(filename, body, "text/markdown;charset=utf-8");
+    showToast(`Exported ${filename}`, "success");
+  });
+}
+
+function decorateAssistantBubble(node, content = "", meta = {}) {
   const bubble = node.querySelector(".message-bubble");
   const existing = bubble.querySelector(".message-tools");
   if (existing) existing.remove();
@@ -657,6 +821,65 @@ function decorateAssistantBubble(node, meta = {}) {
     });
     bubble.appendChild(wrap);
   }
+
+  const flags = normalizeLimitations(meta, meta.tool_trace || []);
+  const existingFlags = bubble.querySelector(".message-flags");
+  if (existingFlags) existingFlags.remove();
+  if (flags.length) {
+    const flagWrap = document.createElement("div");
+    flagWrap.className = "message-flags";
+    flags.forEach((flag) => {
+      const chip = document.createElement("span");
+      chip.className = "result-flag";
+      chip.dataset.tooltip = flag.tip;
+      chip.textContent = flag.label;
+      flagWrap.appendChild(chip);
+    });
+    bubble.appendChild(flagWrap);
+  }
+
+  const followupsWrap = node.querySelector(".message-followups");
+  followupsWrap.innerHTML = "";
+  const followups = buildFollowups(state.lastUserPrompt, content);
+  if (followups.length) {
+    followupsWrap.classList.remove("hidden");
+    const label = document.createElement("div");
+    label.className = "followup-label";
+    label.textContent = "Suggested follow-ups";
+    followupsWrap.appendChild(label);
+    followups.forEach((entry) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "followup-chip";
+      btn.textContent = entry;
+      btn.dataset.tooltip = "Click to send this as your next prompt";
+      btn.addEventListener("click", () => {
+        composerInputEl.value = entry;
+        autoGrowTextarea();
+        composerInputEl.focus();
+      });
+      followupsWrap.appendChild(btn);
+    });
+  } else {
+    followupsWrap.classList.add("hidden");
+  }
+
+  const oldPlan = bubble.querySelector(".agent-plan");
+  if (oldPlan) oldPlan.remove();
+  const plan = derivePlan(meta);
+  const planNode = document.createElement("details");
+  planNode.className = "agent-plan";
+  planNode.open = !!state.planMode;
+  planNode.innerHTML = `
+    <summary data-tooltip="Compact execution plan view: intent, stages, and tools used">Agent plan</summary>
+    <div class="agent-plan-body">
+      <div><strong>Intent:</strong> ${safeEscape(plan.intent)}</div>
+      <div><strong>Stages:</strong> ${safeEscape(plan.stages.join(" → "))}</div>
+      <div><strong>Tools:</strong> ${safeEscape(plan.tools.join(", ") || "None")}</div>
+      <div><strong>Steps:</strong> ${safeEscape(plan.steps.join(" | ") || "No explicit tool steps")}</div>
+    </div>
+  `;
+  bubble.appendChild(planNode);
 }
 
 function createMessageElement(role, content, meta = {}) {
@@ -668,7 +891,8 @@ function createMessageElement(role, content, meta = {}) {
   const bubble = node.querySelector(".message-bubble");
   applyMessageContent(bubble, content, role, false);
   handleCopyMessage(node, content);
-  if (role === "assistant") decorateAssistantBubble(node, meta);
+  handleExportMessage(node, content, meta);
+  if (role === "assistant") decorateAssistantBubble(node, content, meta);
   return node;
 }
 
@@ -690,8 +914,24 @@ function replacePendingAssistant(content, meta = {}) {
   metaEl.textContent = meta.created_at ? fmtDate(meta.created_at) : "";
   const newCopy = state.pendingAssistantElement.querySelector(".message-copy").cloneNode(true);
   state.pendingAssistantElement.querySelector(".message-copy").replaceWith(newCopy);
+  const newExport = state.pendingAssistantElement.querySelector(".message-export").cloneNode(true);
+  state.pendingAssistantElement.querySelector(".message-export").replaceWith(newExport);
   handleCopyMessage(state.pendingAssistantElement, content);
-  decorateAssistantBubble(state.pendingAssistantElement, meta);
+  handleExportMessage(state.pendingAssistantElement, content, meta);
+  decorateAssistantBubble(state.pendingAssistantElement, content, meta);
+  updateInspector(meta);
+  const artifactId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const artifact = {
+    id: artifactId,
+    title: `Assistant result • ${chatTitleEl.textContent || "chat"}`,
+    kind: "chat-export",
+    created_at: new Date().toISOString(),
+    filename: `artifact-${artifactId}.json`,
+    mimeType: "application/json;charset=utf-8",
+    content: JSON.stringify({ content, meta }, null, 2),
+  };
+  state.artifacts.push(artifact);
+  renderArtifacts();
   state.pendingAssistantElement = null;
   scrollChatToBottom(true);
 }
@@ -777,8 +1017,13 @@ async function switchChat(chatId) {
   chatWindowEl.innerHTML = "";
   if (!data.items.length) {
     showEmptyState();
+    updateInspector({});
+    hydrateArtifactsFromMessages([]);
   } else {
     data.items.forEach((message) => appendMessage(message.role, message.content, message.meta || message));
+    const latestAssistant = [...data.items].reverse().find((message) => message.role === "assistant");
+    updateInspector(latestAssistant?.meta || {});
+    hydrateArtifactsFromMessages(data.items);
   }
   setActivityPhase("Idle");
   connectSocket(chatId);
@@ -938,6 +1183,12 @@ function handleSocketEvent(payload) {
       terminalLine(`${payload.phase || "status"} :: ${payload.message}`, "info", "status");
       break;
     case "tool_start":
+      state.pendingToolEvents.push({
+        when: new Date().toISOString(),
+        tool_name: payload.tool_name,
+        arguments: payload.arguments || {},
+        summary: "started",
+      });
       incrementToolCount();
       setActivityPhase("Tool execution");
       setLastEvent(`${payload.tool_name} started`);
@@ -948,6 +1199,11 @@ function handleSocketEvent(payload) {
       );
       break;
     case "tool_result":
+      state.pendingToolEvents.push({
+        when: new Date().toISOString(),
+        tool_name: payload.tool_name,
+        summary: payload.summary || "completed",
+      });
       setLastEvent(`${payload.tool_name} completed`);
       terminalLine(`DONE ${payload.tool_name}\n${payload.summary}\n${payload.result_preview}`, "success", "tool_result");
       break;
@@ -957,6 +1213,7 @@ function handleSocketEvent(payload) {
       terminalLine(`ERROR ${payload.tool_name}\n${payload.stderr || payload.stdout || "unknown"}`, "error", "tool_error");
       break;
     case "assistant_final":
+      state.pendingToolEvents = [];
       replacePendingAssistant(payload.content, payload.meta || {});
       setStatus("", false);
       setBusy(false);
@@ -1056,6 +1313,7 @@ async function deleteChat(chatId, currentTitle = "New chat") {
 function sendMessage() {
   const text = composerInputEl.value.trim();
   if (!text || state.busy) return;
+  state.lastUserPrompt = text;
   if (chatWindowEl.querySelector(".empty-state")) {
     chatWindowEl.innerHTML = "";
   }
@@ -1101,6 +1359,21 @@ toggleTerminalBtnEl.addEventListener("click", () => {
   toggleTerminalBtnEl.textContent = state.terminalVisible ? "Hide console" : "Show console";
   toggleTerminalBtnEl.dataset.tooltip = state.terminalVisible ? "Show or hide the execution console" : "Show the execution console";
 });
+workspaceModeBtnEl.addEventListener("click", () => {
+  state.workspaceMode = !state.workspaceMode;
+  shellEl.classList.toggle("workspace-mode", state.workspaceMode);
+  workspaceModeBtnEl.classList.toggle("active", state.workspaceMode);
+});
+planModeBtnEl.addEventListener("click", () => {
+  state.planMode = !state.planMode;
+  planModeBtnEl.classList.toggle("active", state.planMode);
+  document.querySelectorAll(".agent-plan").forEach((plan) => {
+    plan.open = state.planMode;
+  });
+});
+consoleTabBtnEl.addEventListener("click", () => setRightPaneMode("console"));
+inspectorTabBtnEl.addEventListener("click", () => setRightPaneMode("inspector"));
+artifactsTabBtnEl.addEventListener("click", () => setRightPaneMode("artifacts"));
 clearTerminalBtnEl.addEventListener("click", clearTerminal);
 composerInputEl.addEventListener("input", autoGrowTextarea);
 composerInputEl.addEventListener("keydown", (event) => {
@@ -1135,6 +1408,8 @@ window.addEventListener("load", async () => {
   installTooltipSystem();
   installModalSystem();
   autoGrowTextarea();
+  setRightPaneMode("console");
+  renderArtifacts();
   await loadHealth();
   await loadChats();
   composerInputEl.focus();
