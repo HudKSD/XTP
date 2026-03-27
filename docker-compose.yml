@@ -1,0 +1,16 @@
+services:
+  elastic-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: elastic-analyst-agent
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./skills:/app/skills
+      # Uncomment if you need to mount CA certs or additional trust material
+      # - ./certs:/app/certs:ro
+    restart: unless-stopped

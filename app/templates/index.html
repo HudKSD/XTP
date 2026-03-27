@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{{ app_name }}</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="scene-glow scene-glow-a"></div>
+  <div class="scene-glow scene-glow-b"></div>
+
+  <div id="appShell" class="app-shell">
+    <aside class="sidebar-shell panel-card" aria-label="Conversation history">
+      <div class="sidebar-stack">
+        <section class="brand-panel panel-card inset-card">
+          <div class="brand-topline">
+            <div class="brand-mark-wrap" aria-hidden="true">
+              <div class="brand-mark">LK</div>
+              <div class="brand-mark-ring"></div>
+            </div>
+            <div class="brand-copy">
+              <div class="eyebrow">LidarKinesis</div>
+              <h1>IntelChat</h1>
+              <p class="brand-subtitle">Master agent for natural-language investigations over RBTN DB, with visible tools, durable history, and read-only execution.</p>
+            </div>
+          </div>
+
+          <div class="brand-chips">
+            <span class="surface-chip live"><span class="chip-dot"></span>Live trace</span>
+            <span class="surface-chip">Schema-aware</span>
+            <span class="surface-chip">Read-only</span>
+          </div>
+
+          <div class="sidebar-actions">
+            <button id="newChatBtn" class="primary-btn full-width" data-tooltip="Start a fresh investigation thread">
+              <span class="btn-icon">＋</span>
+              <span>New chat</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="history-panel panel-card inset-card">
+          <div class="panel-head sticky-head">
+            <div>
+              <div class="section-kicker">Conversation memory</div>
+              <h2>History</h2>
+            </div>
+            <div class="history-meta-pill">Grouped by date</div>
+          </div>
+
+          <div class="history-search-wrap">
+            <label class="field-label" for="historySearchInput">Search chats</label>
+            <div class="input-shell compact">
+              <span class="input-icon">⌕</span>
+              <input id="historySearchInput" type="search" placeholder="Search titles or jump between threads" autocomplete="off" />
+              <span class="input-shortcut">⌘/Ctrl K</span>
+            </div>
+          </div>
+
+          <div class="history-caption-row">
+            <span id="historyCountPill" class="surface-chip subtle">0 chats</span>
+            <span class="history-note">Recent 10 stay visible before scrolling</span>
+          </div>
+
+          <div class="history-scroll">
+            <div id="chatList" class="chat-list"></div>
+          </div>
+        </section>
+
+        <section class="sidebar-foot panel-card inset-card muted-card">
+          <div class="section-kicker">Workspace notes</div>
+          <p>Use clear analyst-style prompts for faster turns. The right-side execution console always follows the newest tool event automatically.</p>
+        </section>
+      </div>
+    </aside>
+
+    <main class="workspace-shell">
+      <section class="chat-shell panel-card">
+        <header class="chat-header">
+          <div class="thread-rail header-rail">
+            <div class="chat-header-main">
+              <div class="eyebrow">Master agent</div>
+              <div class="title-row">
+                <h2 id="chatTitle">New chat</h2>
+                <button
+                  id="renameCurrentChatBtn"
+                  class="ghost-icon-btn title-action-btn"
+                  type="button"
+                  aria-label="Rename this chat"
+                  data-tooltip="Rename current chat"
+                >
+                  Rename
+                </button>
+              </div>
+              <p class="subtitle">Ask about CVEs, threat actors, malware, infrastructure, sectors, timelines, evidence, and relationships. Replies stay grounded in RBTN DB and visible tool execution.</p>
+            </div>
+
+            <div class="chat-header-actions">
+              <div class="header-chip live-pulse"><span class="chip-dot"></span>Live execution</div>
+              <button id="toggleTerminalBtn" class="ghost-btn" data-tooltip="Show or hide the execution console">Hide console</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="chat-stage">
+          <div id="chatWindow" class="chat-window"></div>
+        </section>
+
+        <div class="thread-rail status-wrap">
+          <div id="statusBar" class="status-bar hidden" aria-live="polite">
+            <span class="spinner"></span>
+            <span id="statusText">Thinking…</span>
+          </div>
+        </div>
+
+        <footer class="composer-dock">
+          <div class="thread-rail composer-rail">
+            <div class="composer-prompt-row" aria-label="Suggested prompts">
+              <button class="prompt-chip" data-prompt="List the top 5 threat actors in the last 30 days and show the evidence." data-tooltip="Quick-start a top actor analysis">Top threat actors</button>
+              <button class="prompt-chip" data-prompt="Which CVEs were mentioned in the last 14 days?" data-tooltip="Query recent CVE mentions">Recent CVEs</button>
+              <button class="prompt-chip" data-prompt="Show malware families and related infrastructure in the last 30 days." data-tooltip="Map malware to infrastructure">Malware + infrastructure</button>
+              <button class="prompt-chip" data-prompt="Compare incident activity by industry this quarter." data-tooltip="Build a sector comparison">Industry comparison</button>
+            </div>
+
+            <div class="composer-surface panel-card inset-card">
+              <div class="composer-header">
+                <div>
+                  <div class="section-kicker">Investigation prompt</div>
+                  <div class="composer-title">Ask the master agent</div>
+                </div>
+                <div class="composer-hints">
+                  <span class="hint-chip">Enter to send</span>
+                  <span class="hint-chip">Shift + Enter for newline</span>
+                </div>
+              </div>
+
+              <textarea id="composerInput" rows="1" placeholder="Ask about RBTN DB fields, time windows, trends, top values, evidence, or relationships…"></textarea>
+
+              <div class="composer-actions">
+                <div class="composer-meta">
+                  <span class="meta-dot"></span>
+                  <span>Conversation in the center. History on the left. Live execution on the right.</span>
+                </div>
+                <button id="sendBtn" class="send-btn" data-tooltip="Send message to the agent">
+                  <span>Send</span>
+                  <span class="send-arrow">↗</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </section>
+    </main>
+
+    <aside id="terminalPanel" class="activity-shell panel-card" aria-label="Execution console">
+      <div class="activity-stack">
+        <section class="activity-head panel-card inset-card">
+          <div class="activity-topline">
+            <div>
+              <div class="section-kicker">Operations</div>
+              <h3>Execution Console</h3>
+              <p>Live tool calls, script paths, arguments, and summaries. The newest event stays visible automatically.</p>
+            </div>
+            <div class="activity-head-actions">
+              <button id="clearTerminalBtn" class="ghost-btn small" data-tooltip="Clear the execution console">Clear</button>
+            </div>
+          </div>
+
+          <div class="activity-grid">
+            <div class="metric-card">
+              <span class="metric-label">Agent</span>
+              <strong id="agentNameCard">LidarKinesis IntelChat</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Data source</span>
+              <strong id="dbNameCard">RBTN DB</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Current index</span>
+              <strong id="indexCard">Loading…</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Access profile</span>
+              <strong id="modelCard">Read-only</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Current phase</span>
+              <strong id="phaseCard">Idle</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Tool calls</span>
+              <strong id="toolCountCard">0</strong>
+            </div>
+            <div class="metric-card metric-wide">
+              <span class="metric-label">Last event</span>
+              <strong id="lastEventCard">Workspace ready</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="terminal-shell panel-card inset-card">
+          <div class="terminal-toolbar">
+            <span class="terminal-pill live">Live</span>
+            <span class="terminal-pill subtle">Auto-follow</span>
+            <span class="terminal-pill subtle">Analyst telemetry</span>
+          </div>
+          <div id="terminalOutput" class="terminal-output" aria-live="polite"></div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <template id="messageTemplate">
+    <article class="message-row">
+      <div class="message-avatar"></div>
+      <div class="message-card">
+        <div class="message-topline">
+          <div class="message-role"></div>
+          <div class="message-meta"></div>
+          <button class="message-copy ghost-icon-btn" type="button" data-tooltip="Copy message">Copy</button>
+        </div>
+        <div class="message-bubble"></div>
+      </div>
+    </article>
+  </template>
+
+  <div id="modalRoot" class="modal-root hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="backdrop"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <div>
+          <div class="section-kicker">Action required</div>
+          <h3 id="modalTitle">Confirm action</h3>
+        </div>
+        <button id="modalCloseBtn" class="ghost-icon-btn modal-close-btn" type="button" aria-label="Close dialog" data-tooltip="Close dialog">✕</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+      <div id="modalInputWrap" class="modal-input-wrap hidden">
+        <label class="modal-label" for="modalInput">Chat title</label>
+        <input id="modalInput" class="modal-input" type="text" maxlength="180" placeholder="Type a chat title" />
+      </div>
+      <div class="modal-actions">
+        <button id="modalCancelBtn" class="ghost-btn" type="button">Cancel</button>
+        <button id="modalConfirmBtn" class="primary-btn" type="button">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tooltipEl" class="ui-tooltip hidden" role="tooltip"></div>
+  <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
