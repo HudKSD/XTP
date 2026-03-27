@@ -28,14 +28,6 @@ def _env_list(name: str, default: str = "") -> List[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-def _env_secret(name: str, default: str = "") -> str:
-    value = os.getenv(name, default)
-    cleaned = value.strip()
-    if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in {"'", '"'}:
-        cleaned = cleaned[1:-1].strip()
-    return cleaned
-
-
 @dataclass(slots=True)
 class Settings:
     app_name: str
@@ -84,7 +76,7 @@ def load_settings() -> Settings:
         traces_dir=traces_dir,
         skills_root=skills_root,
         trace_enabled=_env_bool("TRACE_ENABLED", True),
-        openai_api_key=_env_secret("OPENAI_API_KEY", ""),
+        openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-5.4-mini").strip(),
         openai_reasoning_effort=os.getenv("OPENAI_REASONING_EFFORT", "low").strip(),
         openai_max_output_tokens=_env_int("OPENAI_MAX_OUTPUT_TOKENS", 1400),
