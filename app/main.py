@@ -24,6 +24,24 @@ agent = ElasticAgent(settings, tool_registry, trace_logger)
 app = Quart(__name__, template_folder="templates", static_folder="static")
 
 
+def _safe_error_message(exc: Exception) -> str:
+    raw = str(exc or "").strip()
+    lowered = raw.lower()
+    if "invalid_api_key" in lowered or "incorrect api key provided" in lowered:
+        return (
+            "OpenAI API authentication failed. "
+            "Set a valid OPENAI_API_KEY in your environment and restart the app."
+        )
+    if "openai_api_key is not configured" in lowered:
+        return (
+            "OPENAI_API_KEY is not configured. "
+            "Add it to your environment (or .env) and restart the app."
+        )
+    if not raw:
+        return "Unexpected error while processing the request."
+    return raw
+
+
 @app.before_serving
 async def startup() -> None:
     await init_db(str(settings.db_path))
@@ -156,7 +174,7 @@ async def ws_chat(chat_id: str):
                 emit=emit,
             )
         except Exception as exc:  # noqa: BLE001
-            await emit("error", {"message": str(exc)})
+            await emit("error", {"message": _safe_error_message(exc)})
             continue
 
         saved_assistant = await add_message(
