@@ -425,8 +425,7 @@ class ElasticAgent:
                 max_output_tokens=320,
             )
             raw = _extract_output_text(response)
-            parsed = json.loads(raw)
-            items = parsed.get("followups") if isinstance(parsed, dict) else None
+            items = _parse_followups_payload(raw)
             if not isinstance(items, list):
                 return []
             cleaned: list[str] = []
@@ -458,6 +457,46 @@ def _extract_output_text(response: Any) -> str:
                     parts.append(value)
 
     return "\n".join(part.strip() for part in parts if part and part.strip()).strip()
+
+
+def _parse_followups_payload(raw: str) -> list[str] | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+
+    def _get_list(candidate: Any) -> list[str] | None:
+        if isinstance(candidate, dict) and isinstance(candidate.get("followups"), list):
+            return [str(item) for item in candidate["followups"]]
+        if isinstance(candidate, list):
+            return [str(item) for item in candidate]
+        return None
+
+    try:
+        direct = json.loads(text)
+        parsed = _get_list(direct)
+        if parsed is not None:
+            return parsed
+    except Exception:
+        pass
+
+    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", text, flags=re.IGNORECASE)
+    if fenced:
+        try:
+            parsed = _get_list(json.loads(fenced.group(1).strip()))
+            if parsed is not None:
+                return parsed
+        except Exception:
+            pass
+
+    object_match = re.search(r"\{[\s\S]*\}", text)
+    if object_match:
+        try:
+            parsed = _get_list(json.loads(object_match.group(0)))
+            if parsed is not None:
+                return parsed
+        except Exception:
+            pass
+    return None
 
 
 

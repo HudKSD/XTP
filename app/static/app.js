@@ -240,6 +240,38 @@ function buildFollowups(prompt = "", response = "") {
   return picks.slice(0, 5);
 }
 
+function extractAnswerSuggestions(content = "") {
+  const text = String(content || "");
+  const picks = [];
+  const push = (value) => {
+    const cleaned = value
+      .replace(/^[-*•\d.)\s]+/, "")
+      .replace(/,\s*or\s*$/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (cleaned && cleaned.length > 6 && !picks.includes(cleaned)) picks.push(cleaned.slice(0, 110));
+  };
+
+  const markerMatch = text.match(/if you want[^:\n]*:\s*([\s\S]{0,520})/i);
+  if (markerMatch?.[1]) {
+    markerMatch[1]
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 8)
+      .forEach(push);
+  }
+
+  text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^[-*•]\s+/.test(line) || /^\d+[.)]\s+/.test(line))
+    .slice(0, 8)
+    .forEach(push);
+
+  return picks.slice(0, 5);
+}
+
 function derivePlan(meta = {}) {
   const tools = Array.isArray(meta.tools_used) ? meta.tools_used : [];
   const steps = tools.map((tool, idx) => `${idx + 1}. ${tool.replaceAll("_", " ")}`);
@@ -841,7 +873,10 @@ function decorateAssistantBubble(node, content = "", meta = {}) {
   const followupsWrap = node.querySelector(".message-followups");
   followupsWrap.innerHTML = "";
   const modelFollowups = Array.isArray(meta.followups) ? meta.followups.map((item) => String(item || "").trim()).filter(Boolean) : [];
-  const followups = modelFollowups.length ? modelFollowups.slice(0, 5) : buildFollowups(state.lastUserPrompt, content);
+  const answerFollowups = extractAnswerSuggestions(content);
+  const followups = modelFollowups.length
+    ? modelFollowups.slice(0, 5)
+    : answerFollowups;
   if (followups.length) {
     followupsWrap.classList.remove("hidden");
     const label = document.createElement("div");
