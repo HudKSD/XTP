@@ -16,6 +16,10 @@ const state = {
   modalResolver: null,
   modalMode: null,
   historyFilter: "",
+  planMode: false,
+  rightPaneMode: "console",
+  pendingToolEvents: [],
+  lastUserPrompt: "",
   activity: {
     phase: "Idle",
     toolCount: 0,
@@ -29,6 +33,7 @@ const historySearchInputEl = document.getElementById("historySearchInput");
 const historyCountPillEl = document.getElementById("historyCountPill");
 const chatWindowEl = document.getElementById("chatWindow");
 const chatTitleEl = document.getElementById("chatTitle");
+const chatFontSizeSelectEl = document.getElementById("chatFontSizeSelect");
 const composerInputEl = document.getElementById("composerInput");
 const sendBtnEl = document.getElementById("sendBtn");
 const newChatBtnEl = document.getElementById("newChatBtn");
@@ -38,14 +43,22 @@ const statusTextEl = document.getElementById("statusText");
 const terminalOutputEl = document.getElementById("terminalOutput");
 const toggleTerminalBtnEl = document.getElementById("toggleTerminalBtn");
 const clearTerminalBtnEl = document.getElementById("clearTerminalBtn");
+const consoleTabBtnEl = document.getElementById("consoleTabBtn");
+const inspectorTabBtnEl = document.getElementById("inspectorTabBtn");
+const consolePaneEl = document.getElementById("consolePane");
+const inspectorPaneEl = document.getElementById("inspectorPane");
+const inspectorCountPillEl = document.getElementById("inspectorCountPill");
+const inspectorFlagsEl = document.getElementById("inspectorFlags");
+const inspectorQueryEl = document.getElementById("inspectorQuery");
+const inspectorToolsEl = document.getElementById("inspectorTools");
 const messageTemplate = document.getElementById("messageTemplate");
-const modelCardEl = document.getElementById("modelCard");
-const indexCardEl = document.getElementById("indexCard");
 const phaseCardEl = document.getElementById("phaseCard");
 const toolCountCardEl = document.getElementById("toolCountCard");
 const lastEventCardEl = document.getElementById("lastEventCard");
 const promptChipEls = Array.from(document.querySelectorAll(".prompt-chip"));
 const tooltipEl = document.getElementById("tooltipEl");
+const selectionActionEl = document.getElementById("selectionAction");
+const toPromptBtnEl = document.getElementById("toPromptBtn");
 const toastHostEl = document.getElementById("toastHost");
 const modalRootEl = document.getElementById("modalRoot");
 const modalBodyEl = document.getElementById("modalBody");
@@ -136,6 +149,12 @@ function scrollTerminalToBottom(force = false) {
   }
 }
 
+function applyChatFontSize(size = "default") {
+  const numeric = Number.parseInt(String(size || "13"), 10);
+  const target = Number.isFinite(numeric) ? Math.min(16, Math.max(5, numeric)) : 13;
+  chatWindowEl.style.setProperty("--chat-font-size", `${target}px`);
+}
+
 function setBusy(value) {
   state.busy = value;
   sendBtnEl.disabled = value;
@@ -185,6 +204,135 @@ function showToast(message, kind = "info") {
     toast.style.transform = "translateY(8px)";
     setTimeout(() => toast.remove(), 200);
   }, 2600);
+}
+
+function downloadFile(filename, content, mimeType = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildFollowups(prompt = "", response = "") {
+  const focus = (prompt || "").toLowerCase();
+  const text = `${prompt}\n${response}`.toLowerCase();
+  const picks = [];
+  const push = (value) => {
+    if (value && !picks.includes(value) && picks.length < 6) picks.push(value);
+  };
+  if (text.includes("cve")) push("Can you break this down by CVE severity and affected products?");
+  if (text.includes("threat actor")) push("Which threat actors showed the largest increase over the same period?");
+  if (text.includes("malware")) push("Can you map the malware families to infrastructure and sectors?");
+  if (text.includes("infrastructure")) push("Which infrastructure indicators appear across multiple campaigns?");
+  if (text.includes("timeline") || text.includes("trend")) push("Show this as a timeline with notable spikes and likely drivers.");
+  if (focus.includes("last") || focus.includes("days") || focus.includes("month")) {
+    push("Compare this with the previous equivalent time window.");
+  }
+  push("What evidence rows most strongly support this conclusion?");
+  push("Can you validate this with an ES|QL query and show the exact query used?");
+  push("What gaps or uncertainty should we account for before acting on this?");
+  return picks.slice(0, 6);
+}
+
+function sanitizeSuggestionText(value = "") {
+  return String(value || "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/(^|\W)\*([^*]+)\*(?=\W|$)/g, "$1$2")
+    .replace(/(^|\W)_([^_]+)_(?=\W|$)/g, "$1$2")
+    .replace(/^[-*•\d.)\s]+/, "")
+    .replace(/,\s*or\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 110);
+}
+
+function extractAnswerSuggestions(content = "") {
+  const text = String(content || "");
+  const picks = [];
+  const push = (value) => {
+    const cleaned = sanitizeSuggestionText(value);
+    if (cleaned && cleaned.length > 6 && !picks.includes(cleaned)) picks.push(cleaned.slice(0, 110));
+  };
+
+  const markerMatch = text.match(/if you want[^:\n]*:\s*([\s\S]{0,520})/i);
+  if (markerMatch?.[1]) {
+    markerMatch[1]
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 8)
+      .forEach(push);
+  }
+
+  text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^[-*•]\s+/.test(line) || /^\d+[.)]\s+/.test(line))
+    .slice(0, 8)
+    .forEach(push);
+
+  return picks.slice(0, 6);
+}
+
+function derivePlan(meta = {}) {
+  const tools = Array.isArray(meta.tools_used) ? meta.tools_used : [];
+  const steps = tools.map((tool, idx) => `${idx + 1}. ${tool.replaceAll("_", " ")}`);
+  return {
+    intent: "Investigate user question against RBTN DB with read-only Elasticsearch tools.",
+    stages: ["Interpret request", "Validate schema/fields", "Execute queries", "Synthesize evidence-backed answer"],
+    tools,
+    steps,
+  };
+}
+
+function setRightPaneMode(mode = "console") {
+  state.rightPaneMode = mode;
+  const pairs = [
+    [consoleTabBtnEl, consolePaneEl, "console"],
+    [inspectorTabBtnEl, inspectorPaneEl, "inspector"],
+  ];
+  pairs.forEach(([tab, pane, key]) => {
+    const active = key === mode;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+    pane.classList.toggle("hidden", !active);
+  });
+}
+
+function normalizeLimitations(meta = {}, toolTrace = []) {
+  const flags = [];
+  const combined = JSON.stringify(meta || {}).toLowerCase() + JSON.stringify(toolTrace || []).toLowerCase();
+  const add = (id, label, tip) => {
+    if (!flags.find((item) => item.id === id)) flags.push({ id, label, tip });
+  };
+  if (combined.includes("sample")) add("sampled", "Sampled", "Result set appears sampled; not all matching records may be represented.");
+  if (combined.includes("truncat") || combined.includes("limit")) add("truncated", "Truncated", "Result may be clipped by size or LIMIT settings.");
+  if (combined.includes("partial")) add("partial", "Partial", "Only part of the expected result set was returned.");
+  if (combined.includes("conflict") || combined.includes("unmapped") || combined.includes("type")) {
+    add("schema", "Schema conflict", "Cross-index field mapping/type differences may have affected query behavior.");
+  }
+  return flags;
+}
+
+function updateInspector(meta = {}) {
+  const trace = Array.isArray(meta.tool_trace) ? meta.tool_trace : [];
+  const queryEntry = [...trace].reverse().find((item) => ["run_esql_query", "run_dsl_query", "validate_dsl_query"].includes(item.tool_name));
+  const queryText = queryEntry?.arguments?.query
+    || (queryEntry?.arguments?.query_body ? JSON.stringify(queryEntry.arguments.query_body, null, 2) : "");
+  inspectorCountPillEl.textContent = trace.length ? `${trace.length} tool event${trace.length === 1 ? "" : "s"}` : "No query yet";
+  inspectorQueryEl.textContent = queryText || "Waiting for an Elasticsearch query...";
+  inspectorToolsEl.innerHTML = trace.length
+    ? trace.map((item) => `<div class="inspector-tool-row"><span>${safeEscape(item.tool_name || "tool")}</span><span data-tooltip="${safeEscape(item.summary || "No summary")}">${safeEscape(item.summary || "No summary")}</span></div>`).join("")
+    : `<div class="chat-history-empty">No tool trace for this response.</div>`;
+  const flags = normalizeLimitations(meta, trace);
+  inspectorFlagsEl.innerHTML = flags.map((flag) => `<span class="result-flag" data-tooltip="${safeEscape(flag.tip)}">${safeEscape(flag.label)}</span>`).join("");
 }
 
 function getTooltipAnchor(target) {
@@ -248,6 +396,67 @@ function installTooltipSystem() {
   window.addEventListener("resize", () => {
     if (state.activeTooltipAnchor) positionTooltip(state.activeTooltipAnchor);
   });
+}
+
+function hideSelectionAction() {
+  selectionActionEl?.classList.add("hidden");
+}
+
+function showSelectionActionForRange(range) {
+  if (!selectionActionEl) return;
+  const rect = range.getBoundingClientRect();
+  if (!rect || (!rect.width && !rect.height)) {
+    hideSelectionAction();
+    return;
+  }
+  const top = Math.max(8, rect.top - 34);
+  const left = Math.min(window.innerWidth - 90, Math.max(8, rect.left + rect.width / 2 - 36));
+  selectionActionEl.style.top = `${top}px`;
+  selectionActionEl.style.left = `${left}px`;
+  selectionActionEl.classList.remove("hidden");
+}
+
+function installSelectionAction() {
+  const refresh = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount) {
+      hideSelectionAction();
+      return;
+    }
+    const text = selection.toString().trim();
+    if (!text) {
+      hideSelectionAction();
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer instanceof Element
+      ? range.commonAncestorContainer
+      : range.commonAncestorContainer.parentElement;
+    if (!container || !chatWindowEl.contains(container)) {
+      hideSelectionAction();
+      return;
+    }
+    showSelectionActionForRange(range);
+  };
+
+  document.addEventListener("mouseup", refresh);
+  document.addEventListener("keyup", refresh);
+  document.addEventListener("scroll", hideSelectionAction, true);
+  document.addEventListener("mousedown", (event) => {
+    if (selectionActionEl && event.target instanceof Node && selectionActionEl.contains(event.target)) return;
+    hideSelectionAction();
+  });
+
+  if (toPromptBtnEl) {
+    toPromptBtnEl.addEventListener("click", () => {
+      const text = window.getSelection()?.toString().trim();
+      if (!text) return;
+      composerInputEl.value = text;
+      autoGrowTextarea();
+      composerInputEl.focus();
+      hideSelectionAction();
+    });
+  }
 }
 
 function openModal({
@@ -560,6 +769,21 @@ function renderChats() {
       const actions = document.createElement("div");
       actions.className = "chat-item-actions";
 
+      const exportBtn = document.createElement("button");
+      exportBtn.type = "button";
+      exportBtn.className = "chat-action-btn icon-only";
+      exportBtn.textContent = "⬇";
+      exportBtn.setAttribute("aria-label", `Export ${chat.title || "New chat"}`);
+      exportBtn.dataset.tooltip = `Export “${chat.title || "New chat"}”`;
+      exportBtn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        try {
+          await exportChatTranscript(chat.id, chat.title || "chat");
+        } catch (err) {
+          showToast(`Export failed: ${err.message}`, "error");
+        }
+      });
+
       const renameBtn = document.createElement("button");
       renameBtn.type = "button";
       renameBtn.className = "chat-action-btn icon-only";
@@ -582,7 +806,7 @@ function renderChats() {
         deleteChat(chat.id, chat.title || "New chat");
       });
 
-      actions.append(renameBtn, deleteBtn);
+      actions.append(exportBtn, renameBtn, deleteBtn);
       shell.append(mainBtn, actions);
       list.appendChild(shell);
     });
@@ -590,6 +814,29 @@ function renderChats() {
     section.appendChild(list);
     chatListEl.appendChild(section);
   });
+}
+
+async function exportChatTranscript(chatId, title = "chat") {
+  const data = await api(`/api/chats/${chatId}/messages`);
+  const parts = (data.items || []).map((message) => {
+    const role = message.role === "user" ? "Prompt" : "Response";
+    return `<h3>${role}</h3><p>${safeEscape(message.content || "").replace(/\n/g, "<br/>")}</p>`;
+  });
+  const slug = (title || "chat").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const filename = `${slug || "chat"}-${new Date().toISOString().replace(/[:.]/g, "-")}.doc`;
+  const payload = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:w="urn:schemas-microsoft-com:office:word"
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="utf-8"><title>${safeEscape(title || "Chat transcript")}</title></head>
+    <body>
+      <h2>${safeEscape(title || "Chat transcript")}</h2>
+      ${parts.join("<hr/>")}
+    </body>
+    </html>
+  `;
+  downloadFile(filename, payload.trim(), "application/msword;charset=utf-8");
+  showToast(`Exported ${filename}`, "success");
 }
 
 function showEmptyState() {
@@ -634,7 +881,19 @@ function handleCopyMessage(node, content) {
   btn.dataset.tooltip = "Copy message";
   btn.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(content || "");
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(content || "");
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = content || "";
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
       showToast("Message copied", "success");
     } catch {
       showToast("Copy failed", "error");
@@ -642,7 +901,42 @@ function handleCopyMessage(node, content) {
   });
 }
 
-function decorateAssistantBubble(node, meta = {}) {
+function handleExportMessage(node, content, meta = {}) {
+  const btn = node.querySelector(".message-export");
+  if (!btn) return;
+  btn.dataset.tooltip = "Export this response as MS Word (.doc)";
+  btn.classList.toggle("hidden", node.classList.contains("user"));
+  btn.addEventListener("click", () => {
+    const title = (chatTitleEl.textContent || "chat-result").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `${title || "chat-result"}-${stamp}.doc`;
+    const bubble = node.querySelector(".message-bubble");
+    let htmlBody = `<p>${safeEscape(content || "")}</p>`;
+    if (bubble) {
+      const clone = bubble.cloneNode(true);
+      clone.querySelectorAll(".message-tools, .message-flags, .agent-plan").forEach((el) => el.remove());
+      htmlBody = clone.innerHTML;
+    }
+    const promptText = node.previousElementSibling?.classList?.contains("user")
+      ? node.previousElementSibling.querySelector(".message-bubble")?.innerText?.trim()
+      : "";
+    const payload = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:w="urn:schemas-microsoft-com:office:word"
+            xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8"><title>${safeEscape(chatTitleEl.textContent || "Chat result")}</title></head>
+      <body>
+        ${promptText ? `<h3>Prompt</h3><p>${safeEscape(promptText)}</p><hr/>` : ""}
+        ${htmlBody}
+      </body>
+      </html>
+    `;
+    downloadFile(filename, payload.trim(), "application/msword;charset=utf-8");
+    showToast(`Exported ${filename}`, "success");
+  });
+}
+
+function decorateAssistantBubble(node, content = "", meta = {}) {
   const bubble = node.querySelector(".message-bubble");
   const existing = bubble.querySelector(".message-tools");
   if (existing) existing.remove();
@@ -657,6 +951,73 @@ function decorateAssistantBubble(node, meta = {}) {
     });
     bubble.appendChild(wrap);
   }
+
+  const flags = normalizeLimitations(meta, meta.tool_trace || []);
+  const existingFlags = bubble.querySelector(".message-flags");
+  if (existingFlags) existingFlags.remove();
+  if (flags.length) {
+    const flagWrap = document.createElement("div");
+    flagWrap.className = "message-flags";
+    flags.forEach((flag) => {
+      const chip = document.createElement("span");
+      chip.className = "result-flag";
+      chip.dataset.tooltip = flag.tip;
+      chip.textContent = flag.label;
+      flagWrap.appendChild(chip);
+    });
+    bubble.appendChild(flagWrap);
+  }
+
+  const followupsWrap = node.querySelector(".message-followups");
+  followupsWrap.innerHTML = "";
+  const modelFollowups = Array.isArray(meta.followups)
+    ? meta.followups
+      .map((item) => sanitizeSuggestionText(String(item || "")))
+      .filter(Boolean)
+    : [];
+  const answerFollowups = extractAnswerSuggestions(content);
+  const followups = modelFollowups.length
+    ? modelFollowups.slice(0, 6)
+    : answerFollowups;
+  if (followups.length) {
+    followupsWrap.classList.remove("hidden");
+    const label = document.createElement("div");
+    label.className = "followup-label";
+    label.textContent = "Suggested follow-ups";
+    followupsWrap.appendChild(label);
+    followups.forEach((entry) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "followup-chip";
+      btn.textContent = entry;
+      btn.dataset.tooltip = "Click to send this as your next prompt";
+      btn.addEventListener("click", () => {
+        composerInputEl.value = entry;
+        autoGrowTextarea();
+        composerInputEl.focus();
+      });
+      followupsWrap.appendChild(btn);
+    });
+  } else {
+    followupsWrap.classList.add("hidden");
+  }
+
+  const oldPlan = bubble.querySelector(".agent-plan");
+  if (oldPlan) oldPlan.remove();
+  const plan = derivePlan(meta);
+  const planNode = document.createElement("details");
+  planNode.className = "agent-plan";
+  planNode.open = !!state.planMode;
+  planNode.innerHTML = `
+    <summary data-tooltip="Compact execution plan view: intent, stages, and tools used">Agent plan</summary>
+    <div class="agent-plan-body">
+      <div><strong>Intent:</strong> ${safeEscape(plan.intent)}</div>
+      <div><strong>Stages:</strong> ${safeEscape(plan.stages.join(" → "))}</div>
+      <div><strong>Tools:</strong> ${safeEscape(plan.tools.join(", ") || "None")}</div>
+      <div><strong>Steps:</strong> ${safeEscape(plan.steps.join(" | ") || "No explicit tool steps")}</div>
+    </div>
+  `;
+  bubble.appendChild(planNode);
 }
 
 function createMessageElement(role, content, meta = {}) {
@@ -668,7 +1029,8 @@ function createMessageElement(role, content, meta = {}) {
   const bubble = node.querySelector(".message-bubble");
   applyMessageContent(bubble, content, role, false);
   handleCopyMessage(node, content);
-  if (role === "assistant") decorateAssistantBubble(node, meta);
+  handleExportMessage(node, content, meta);
+  if (role === "assistant") decorateAssistantBubble(node, content, meta);
   return node;
 }
 
@@ -690,8 +1052,12 @@ function replacePendingAssistant(content, meta = {}) {
   metaEl.textContent = meta.created_at ? fmtDate(meta.created_at) : "";
   const newCopy = state.pendingAssistantElement.querySelector(".message-copy").cloneNode(true);
   state.pendingAssistantElement.querySelector(".message-copy").replaceWith(newCopy);
+  const newExport = state.pendingAssistantElement.querySelector(".message-export").cloneNode(true);
+  state.pendingAssistantElement.querySelector(".message-export").replaceWith(newExport);
   handleCopyMessage(state.pendingAssistantElement, content);
-  decorateAssistantBubble(state.pendingAssistantElement, meta);
+  handleExportMessage(state.pendingAssistantElement, content, meta);
+  decorateAssistantBubble(state.pendingAssistantElement, content, meta);
+  updateInspector(meta);
   state.pendingAssistantElement = null;
   scrollChatToBottom(true);
 }
@@ -713,6 +1079,7 @@ async function api(path, options = {}) {
     try {
       data = JSON.parse(text);
     } catch {
+      if (!res.ok) throw new Error(`Request failed (${res.status}): ${text.slice(0, 180)}`);
       throw new Error(`Unexpected server response (${res.status})`);
     }
   }
@@ -723,11 +1090,12 @@ async function api(path, options = {}) {
 async function loadHealth() {
   try {
     const data = await api("/api/health");
-    modelCardEl.textContent = "Read-only";
-    indexCardEl.textContent = data.default_index || "Not set";
+    const indexChip = document.getElementById("lastEventCard");
+    if (indexChip && data.default_index) {
+      indexChip.dataset.tooltip = `Current default index: ${data.default_index}`;
+    }
     setLastEvent("Workspace ready");
   } catch (err) {
-    indexCardEl.textContent = "Unavailable";
     terminalLine(`Health check failed: ${err.message}`, "error", "health");
     showToast("Workspace health check failed", "error");
   }
@@ -777,8 +1145,11 @@ async function switchChat(chatId) {
   chatWindowEl.innerHTML = "";
   if (!data.items.length) {
     showEmptyState();
+    updateInspector({});
   } else {
     data.items.forEach((message) => appendMessage(message.role, message.content, message.meta || message));
+    const latestAssistant = [...data.items].reverse().find((message) => message.role === "assistant");
+    updateInspector(latestAssistant?.meta || {});
   }
   setActivityPhase("Idle");
   connectSocket(chatId);
@@ -938,6 +1309,12 @@ function handleSocketEvent(payload) {
       terminalLine(`${payload.phase || "status"} :: ${payload.message}`, "info", "status");
       break;
     case "tool_start":
+      state.pendingToolEvents.push({
+        when: new Date().toISOString(),
+        tool_name: payload.tool_name,
+        arguments: payload.arguments || {},
+        summary: "started",
+      });
       incrementToolCount();
       setActivityPhase("Tool execution");
       setLastEvent(`${payload.tool_name} started`);
@@ -948,6 +1325,11 @@ function handleSocketEvent(payload) {
       );
       break;
     case "tool_result":
+      state.pendingToolEvents.push({
+        when: new Date().toISOString(),
+        tool_name: payload.tool_name,
+        summary: payload.summary || "completed",
+      });
       setLastEvent(`${payload.tool_name} completed`);
       terminalLine(`DONE ${payload.tool_name}\n${payload.summary}\n${payload.result_preview}`, "success", "tool_result");
       break;
@@ -957,6 +1339,7 @@ function handleSocketEvent(payload) {
       terminalLine(`ERROR ${payload.tool_name}\n${payload.stderr || payload.stdout || "unknown"}`, "error", "tool_error");
       break;
     case "assistant_final":
+      state.pendingToolEvents = [];
       replacePendingAssistant(payload.content, payload.meta || {});
       setStatus("", false);
       setBusy(false);
@@ -1056,6 +1439,7 @@ async function deleteChat(chatId, currentTitle = "New chat") {
 function sendMessage() {
   const text = composerInputEl.value.trim();
   if (!text || state.busy) return;
+  state.lastUserPrompt = text;
   if (chatWindowEl.querySelector(".empty-state")) {
     chatWindowEl.innerHTML = "";
   }
@@ -1101,6 +1485,8 @@ toggleTerminalBtnEl.addEventListener("click", () => {
   toggleTerminalBtnEl.textContent = state.terminalVisible ? "Hide console" : "Show console";
   toggleTerminalBtnEl.dataset.tooltip = state.terminalVisible ? "Show or hide the execution console" : "Show the execution console";
 });
+consoleTabBtnEl.addEventListener("click", () => setRightPaneMode("console"));
+inspectorTabBtnEl.addEventListener("click", () => setRightPaneMode("inspector"));
 clearTerminalBtnEl.addEventListener("click", clearTerminal);
 composerInputEl.addEventListener("input", autoGrowTextarea);
 composerInputEl.addEventListener("keydown", (event) => {
@@ -1133,8 +1519,16 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("beforeunload", () => closeSocket({ manual: true }));
 window.addEventListener("load", async () => {
   installTooltipSystem();
+  installSelectionAction();
   installModalSystem();
   autoGrowTextarea();
+  applyChatFontSize(chatFontSizeSelectEl?.value || "default");
+  if (chatFontSizeSelectEl) {
+    chatFontSizeSelectEl.addEventListener("change", (event) => {
+      applyChatFontSize(event.target.value);
+    });
+  }
+  setRightPaneMode("console");
   await loadHealth();
   await loadChats();
   composerInputEl.focus();

@@ -110,10 +110,12 @@ class ElasticAgent:
             ]
             if not function_calls:
                 final_text = _extract_output_text(response)
+                followups = await self._generate_followups(latest_user_message, final_text, tool_trace)
                 meta = {
                     "model": self.settings.openai_model,
                     "tools_used": [entry["tool_name"] for entry in tool_trace],
                     "tool_trace": tool_trace,
+                    "followups": followups,
                 }
                 self.trace_logger.write(
                     chat_id,
@@ -197,13 +199,6 @@ class ElasticAgent:
                             "For validate_dsl_query and run_dsl_query, always send a full query_body object."
                         ),
                     }
-                    await emit(
-                        "error",
-                        {
-                            "message": str(exc),
-                            "tool_name": tool_name,
-                        },
-                    )
                     self.trace_logger.write(
                         chat_id,
                         {
@@ -234,6 +229,8 @@ class ElasticAgent:
                         "tool_name": tool_name,
                         "arguments": args,
                         "summary": result.get("summary") or result.get("message") or ("error" if not result.get("ok", True) else "ok"),
+                        "limitations": self._extract_limitations(tool_name, result),
+                        "query_preview": self._extract_query_preview(tool_name, args, result),
                     }
                 )
                 outputs_for_model.append(
@@ -318,6 +315,31 @@ class ElasticAgent:
     def _fingerprint_tool_call(self, tool_name: str, args: dict[str, Any]) -> str:
         return f"{tool_name}::{json.dumps(args, sort_keys=True, ensure_ascii=False, default=str)}"
 
+    def _extract_query_preview(self, tool_name: str, args: dict[str, Any], result: dict[str, Any]) -> str:
+        if tool_name == "run_esql_query":
+            return str(result.get("query") or args.get("query") or "")
+        if tool_name in {"run_dsl_query", "validate_dsl_query"}:
+            body = result.get("query_body") or args.get("query_body")
+            if isinstance(body, dict):
+                return json.dumps(body, ensure_ascii=False, default=str)
+        return ""
+
+    def _extract_limitations(self, tool_name: str, result: dict[str, Any]) -> list[str]:
+        flags: list[str] = []
+        row_count = result.get("row_count")
+        if tool_name == "run_esql_query" and isinstance(row_count, int):
+            if row_count >= 100:
+                flags.append("truncated")
+                flags.append("sampled")
+        warnings = result.get("warnings") or []
+        if isinstance(warnings, list):
+            warning_text = " ".join(str(item).lower() for item in warnings)
+            if "unmapped" in warning_text or "conflict" in warning_text or "type" in warning_text:
+                flags.append("schema_conflict")
+            if "limit" in warning_text:
+                flags.append("truncated")
+        return sorted(set(flags))
+
     async def _force_finalize(
         self,
         chat_id: str,
@@ -358,11 +380,13 @@ class ElasticAgent:
             max_output_tokens=self.settings.openai_max_output_tokens,
         )
         final_text = _extract_output_text(response)
+        followups = await self._generate_followups(latest_user_message, final_text, tool_trace)
         meta = {
             "model": self.settings.openai_model,
             "tools_used": [entry["tool_name"] for entry in tool_trace],
             "tool_trace": tool_trace,
             "forced_finalization": True,
+            "followups": followups,
         }
         self.trace_logger.write(
             chat_id,
@@ -373,6 +397,49 @@ class ElasticAgent:
             },
         )
         return final_text, meta
+
+    async def _generate_followups(
+        self,
+        latest_user_message: str,
+        assistant_answer: str,
+        tool_trace: list[dict[str, Any]],
+    ) -> list[str]:
+        tools_used = [entry.get("tool_name") for entry in tool_trace if entry.get("tool_name")]
+        prompt = (
+            "Generate exactly 6 concise, actionable follow-up prompt questions for a cybersecurity threat hunter.\n"
+            "Requirements:\n"
+            "- Must be specific to the user request and assistant answer.\n"
+            "- Must be pivot-oriented (next investigative steps on IOC, actor, malware, infra, timeline, or sector).\n"
+            "- Must avoid generic wording and avoid markdown symbols (*, **, backticks).\n"
+            "- Every follow-up must be a standalone question sentence ending with '?'.\n"
+            "- Each prompt must be a single line under 110 characters.\n"
+            "- Return JSON only: {\"followups\":[\"...\",\"...\",\"...\",\"...\",\"...\",\"...\"]}\n\n"
+            f"User request:\n{latest_user_message}\n\n"
+            f"Assistant answer:\n{assistant_answer}\n\n"
+            f"Tools used:\n{', '.join(tools_used) if tools_used else 'none'}"
+        )
+        try:
+            response = await self.client.responses.create(
+                model=self.settings.openai_model,
+                input=prompt,
+                instructions="You produce strict JSON only.",
+                reasoning={"effort": "minimal"},
+                max_output_tokens=320,
+            )
+            raw = _extract_output_text(response)
+            items = _parse_followups_payload(raw)
+            if not isinstance(items, list):
+                return []
+            cleaned: list[str] = []
+            for value in items:
+                text = _clean_followup_text(str(value or ""))
+                if text and text not in cleaned:
+                    cleaned.append(text[:110])
+                if len(cleaned) >= 6:
+                    break
+            return cleaned
+        except Exception:
+            return []
 
 
 def _extract_output_text(response: Any) -> str:
@@ -392,6 +459,60 @@ def _extract_output_text(response: Any) -> str:
                     parts.append(value)
 
     return "\n".join(part.strip() for part in parts if part and part.strip()).strip()
+
+
+def _parse_followups_payload(raw: str) -> list[str] | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+
+    def _get_list(candidate: Any) -> list[str] | None:
+        if isinstance(candidate, dict) and isinstance(candidate.get("followups"), list):
+            return [str(item) for item in candidate["followups"]]
+        if isinstance(candidate, list):
+            return [str(item) for item in candidate]
+        return None
+
+    try:
+        direct = json.loads(text)
+        parsed = _get_list(direct)
+        if parsed is not None:
+            return parsed
+    except Exception:
+        pass
+
+    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", text, flags=re.IGNORECASE)
+    if fenced:
+        try:
+            parsed = _get_list(json.loads(fenced.group(1).strip()))
+            if parsed is not None:
+                return parsed
+        except Exception:
+            pass
+
+    object_match = re.search(r"\{[\s\S]*\}", text)
+    if object_match:
+        try:
+            parsed = _get_list(json.loads(object_match.group(0)))
+            if parsed is not None:
+                return parsed
+        except Exception:
+            pass
+    return None
+
+
+def _clean_followup_text(value: str) -> str:
+    text = (value or "").strip()
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = re.sub(r"__([^_]+)__", r"\1", text)
+    text = re.sub(r"(^|\W)\*([^*]+)\*(?=\W|$)", r"\1\2", text)
+    text = re.sub(r"(^|\W)_([^_]+)_(?=\W|$)", r"\1\2", text)
+    text = re.sub(r"^[-*•\d.)\s]+", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if text and not text.endswith("?"):
+        text = text.rstrip(".!:;") + "?"
+    return text
 
 
 

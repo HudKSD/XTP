@@ -4,32 +4,27 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>{{ app_name }}</title>
+  <link rel="icon" type="image/png" href="https://news.rabitanoor.com/content/images/2024/10/1-2.png" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <div class="scene-glow scene-glow-a"></div>
   <div class="scene-glow scene-glow-b"></div>
 
-  <div id="appShell" class="app-shell">
+  <div id="appShell" class="app-shell workspace-mode">
     <aside class="sidebar-shell panel-card" aria-label="Conversation history">
       <div class="sidebar-stack">
         <section class="brand-panel panel-card inset-card">
           <div class="brand-topline">
             <div class="brand-mark-wrap" aria-hidden="true">
-              <div class="brand-mark">LK</div>
+              <img class="brand-logo" src="https://news.rabitanoor.com/content/images/2024/10/1-2.png" alt="RBTN logo" />
               <div class="brand-mark-ring"></div>
             </div>
             <div class="brand-copy">
               <div class="eyebrow">LidarKinesis</div>
               <h1>IntelChat</h1>
-              <p class="brand-subtitle">Master agent for natural-language investigations over RBTN DB, with visible tools, durable history, and read-only execution.</p>
+              <p class="brand-subtitle">Natural-language investigations over RBTN DB with visible execution.</p>
             </div>
-          </div>
-
-          <div class="brand-chips">
-            <span class="surface-chip live"><span class="chip-dot"></span>Live trace</span>
-            <span class="surface-chip">Schema-aware</span>
-            <span class="surface-chip">Read-only</span>
           </div>
 
           <div class="sidebar-actions">
@@ -46,11 +41,9 @@
               <div class="section-kicker">Conversation memory</div>
               <h2>History</h2>
             </div>
-            <div class="history-meta-pill">Grouped by date</div>
           </div>
 
           <div class="history-search-wrap">
-            <label class="field-label" for="historySearchInput">Search chats</label>
             <div class="input-shell compact">
               <span class="input-icon">⌕</span>
               <input id="historySearchInput" type="search" placeholder="Search titles or jump between threads" autocomplete="off" />
@@ -60,7 +53,6 @@
 
           <div class="history-caption-row">
             <span id="historyCountPill" class="surface-chip subtle">0 chats</span>
-            <span class="history-note">Recent 10 stay visible before scrolling</span>
           </div>
 
           <div class="history-scroll">
@@ -68,10 +60,6 @@
           </div>
         </section>
 
-        <section class="sidebar-foot panel-card inset-card muted-card">
-          <div class="section-kicker">Workspace notes</div>
-          <p>Use clear analyst-style prompts for faster turns. The right-side execution console always follows the newest tool event automatically.</p>
-        </section>
       </div>
     </aside>
 
@@ -80,7 +68,7 @@
         <header class="chat-header">
           <div class="thread-rail header-rail">
             <div class="chat-header-main">
-              <div class="eyebrow">Master agent</div>
+              <div class="eyebrow"><img class="header-logo" src="https://news.rabitanoor.com/content/images/2024/10/1-2.png" alt="" /> Master agent</div>
               <div class="title-row">
                 <h2 id="chatTitle">New chat</h2>
                 <button
@@ -92,13 +80,25 @@
                 >
                   Rename
                 </button>
+                <label class="chat-font-control" for="chatFontSizeSelect">
+                  <span>Text</span>
+                  <select id="chatFontSizeSelect" aria-label="Chat text size">
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                    <option value="13" selected>13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16">16</option>
+                  </select>
+                </label>
+                <button id="toggleTerminalBtn" class="ghost-btn small" data-tooltip="Show or hide the execution console">Hide console</button>
               </div>
-              <p class="subtitle">Ask about CVEs, threat actors, malware, infrastructure, sectors, timelines, evidence, and relationships. Replies stay grounded in RBTN DB and visible tool execution.</p>
-            </div>
-
-            <div class="chat-header-actions">
-              <div class="header-chip live-pulse"><span class="chip-dot"></span>Live execution</div>
-              <button id="toggleTerminalBtn" class="ghost-btn" data-tooltip="Show or hide the execution console">Hide console</button>
             </div>
           </div>
         </header>
@@ -116,17 +116,9 @@
 
         <footer class="composer-dock">
           <div class="thread-rail composer-rail">
-            <div class="composer-prompt-row" aria-label="Suggested prompts">
-              <button class="prompt-chip" data-prompt="List the top 5 threat actors in the last 30 days and show the evidence." data-tooltip="Quick-start a top actor analysis">Top threat actors</button>
-              <button class="prompt-chip" data-prompt="Which CVEs were mentioned in the last 14 days?" data-tooltip="Query recent CVE mentions">Recent CVEs</button>
-              <button class="prompt-chip" data-prompt="Show malware families and related infrastructure in the last 30 days." data-tooltip="Map malware to infrastructure">Malware + infrastructure</button>
-              <button class="prompt-chip" data-prompt="Compare incident activity by industry this quarter." data-tooltip="Build a sector comparison">Industry comparison</button>
-            </div>
-
             <div class="composer-surface panel-card inset-card">
               <div class="composer-header">
                 <div>
-                  <div class="section-kicker">Investigation prompt</div>
                   <div class="composer-title">Ask the master agent</div>
                 </div>
                 <div class="composer-hints">
@@ -135,7 +127,7 @@
                 </div>
               </div>
 
-              <textarea id="composerInput" rows="1" placeholder="Ask about RBTN DB fields, time windows, trends, top values, evidence, or relationships…"></textarea>
+              <textarea id="composerInput" rows="1" placeholder="Ask about RBTN DB fields, time windows, trends, top values, evidence, or relationships…" data-tooltip="Prompt input with red-tinted focus to keep the investigation thread prominent"></textarea>
 
               <div class="composer-actions">
                 <div class="composer-meta">
@@ -158,9 +150,7 @@
         <section class="activity-head panel-card inset-card">
           <div class="activity-topline">
             <div>
-              <div class="section-kicker">Operations</div>
               <h3>Execution Console</h3>
-              <p>Live tool calls, script paths, arguments, and summaries. The newest event stays visible automatically.</p>
             </div>
             <div class="activity-head-actions">
               <button id="clearTerminalBtn" class="ghost-btn small" data-tooltip="Clear the execution console">Clear</button>
@@ -168,22 +158,6 @@
           </div>
 
           <div class="activity-grid">
-            <div class="metric-card">
-              <span class="metric-label">Agent</span>
-              <strong id="agentNameCard">LidarKinesis IntelChat</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Data source</span>
-              <strong id="dbNameCard">RBTN DB</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Current index</span>
-              <strong id="indexCard">Loading…</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Access profile</span>
-              <strong id="modelCard">Read-only</strong>
-            </div>
             <div class="metric-card">
               <span class="metric-label">Current phase</span>
               <strong id="phaseCard">Idle</strong>
@@ -200,12 +174,25 @@
         </section>
 
         <section class="terminal-shell panel-card inset-card">
-          <div class="terminal-toolbar">
-            <span class="terminal-pill live">Live</span>
-            <span class="terminal-pill subtle">Auto-follow</span>
-            <span class="terminal-pill subtle">Analyst telemetry</span>
+          <div class="pane-tabs" role="tablist" aria-label="Right pane modes">
+            <button id="consoleTabBtn" class="pane-tab active" type="button" role="tab" aria-selected="true">Console</button>
+            <button id="inspectorTabBtn" class="pane-tab" type="button" role="tab" aria-selected="false">Query Inspector</button>
           </div>
-          <div id="terminalOutput" class="terminal-output" aria-live="polite"></div>
+
+          <div id="consolePane" class="right-pane-mode">
+            <div id="terminalOutput" class="terminal-output" aria-live="polite"></div>
+          </div>
+
+          <div id="inspectorPane" class="right-pane-mode hidden">
+            <div class="inspector-head">
+              <span class="surface-chip subtle" data-tooltip="Shows the latest generated ES query or ES|QL statement">Latest query context</span>
+              <span id="inspectorCountPill" class="surface-chip subtle">No query yet</span>
+            </div>
+            <div id="inspectorFlags" class="inspector-flags"></div>
+            <pre id="inspectorQuery" class="inspector-query">Waiting for an Elasticsearch query...</pre>
+            <div id="inspectorTools" class="inspector-tools"></div>
+          </div>
+
         </section>
       </div>
     </aside>
@@ -218,9 +205,11 @@
         <div class="message-topline">
           <div class="message-role"></div>
           <div class="message-meta"></div>
-          <button class="message-copy ghost-icon-btn" type="button" data-tooltip="Copy message">Copy</button>
+          <button class="message-copy ghost-icon-btn compact-icon-btn" type="button" data-tooltip="Copy message" aria-label="Copy message">⧉</button>
+          <button class="message-export ghost-icon-btn compact-icon-btn" type="button" data-tooltip="Export this response as MS Word (.doc)" aria-label="Export this response as MS Word">⬇</button>
         </div>
         <div class="message-bubble"></div>
+        <div class="message-followups hidden"></div>
       </div>
     </article>
   </template>
@@ -248,6 +237,9 @@
   </div>
 
   <div id="tooltipEl" class="ui-tooltip hidden" role="tooltip"></div>
+  <div id="selectionAction" class="selection-action hidden">
+    <button id="toPromptBtn" type="button">to prompt</button>
+  </div>
   <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="true"></div>
 
   <script src="/static/app.js"></script>

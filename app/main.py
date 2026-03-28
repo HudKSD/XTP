@@ -78,12 +78,15 @@ async def api_patch_chat(chat_id: str):
 
 @app.delete("/api/chats/<chat_id>")
 async def api_delete_chat(chat_id: str):
-    chat = await get_chat(str(settings.db_path), chat_id)
-    if not chat:
-        return jsonify({"error": "Chat not found"}), 404
+    try:
+        chat = await get_chat(str(settings.db_path), chat_id)
+        if not chat:
+            return jsonify({"error": "Chat not found"}), 404
 
-    await delete_chat(str(settings.db_path), chat_id)
-    return jsonify({"ok": True, "deleted_chat_id": chat_id})
+        await delete_chat(str(settings.db_path), chat_id)
+        return jsonify({"ok": True, "deleted_chat_id": chat_id})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"Delete failed: {str(exc)}"}), 500
 
 
 @app.get("/api/chats/<chat_id>/messages")
