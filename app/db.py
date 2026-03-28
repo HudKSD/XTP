@@ -165,5 +165,6 @@ async def get_messages(db_path: str, chat_id: str) -> list[dict[str, Any]]:
 
 async def delete_chat(db_path: str, chat_id: str) -> None:
     async with open_db(db_path) as db:
+        await db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
         await db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
         await db.commit()
