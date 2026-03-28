@@ -57,6 +57,8 @@ const toolCountCardEl = document.getElementById("toolCountCard");
 const lastEventCardEl = document.getElementById("lastEventCard");
 const promptChipEls = Array.from(document.querySelectorAll(".prompt-chip"));
 const tooltipEl = document.getElementById("tooltipEl");
+const selectionActionEl = document.getElementById("selectionAction");
+const toPromptBtnEl = document.getElementById("toPromptBtn");
 const toastHostEl = document.getElementById("toastHost");
 const modalRootEl = document.getElementById("modalRoot");
 const modalBodyEl = document.getElementById("modalBody");
@@ -394,6 +396,67 @@ function installTooltipSystem() {
   window.addEventListener("resize", () => {
     if (state.activeTooltipAnchor) positionTooltip(state.activeTooltipAnchor);
   });
+}
+
+function hideSelectionAction() {
+  selectionActionEl?.classList.add("hidden");
+}
+
+function showSelectionActionForRange(range) {
+  if (!selectionActionEl) return;
+  const rect = range.getBoundingClientRect();
+  if (!rect || (!rect.width && !rect.height)) {
+    hideSelectionAction();
+    return;
+  }
+  const top = Math.max(8, rect.top - 34);
+  const left = Math.min(window.innerWidth - 90, Math.max(8, rect.left + rect.width / 2 - 36));
+  selectionActionEl.style.top = `${top}px`;
+  selectionActionEl.style.left = `${left}px`;
+  selectionActionEl.classList.remove("hidden");
+}
+
+function installSelectionAction() {
+  const refresh = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount) {
+      hideSelectionAction();
+      return;
+    }
+    const text = selection.toString().trim();
+    if (!text) {
+      hideSelectionAction();
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer instanceof Element
+      ? range.commonAncestorContainer
+      : range.commonAncestorContainer.parentElement;
+    if (!container || !chatWindowEl.contains(container)) {
+      hideSelectionAction();
+      return;
+    }
+    showSelectionActionForRange(range);
+  };
+
+  document.addEventListener("mouseup", refresh);
+  document.addEventListener("keyup", refresh);
+  document.addEventListener("scroll", hideSelectionAction, true);
+  document.addEventListener("mousedown", (event) => {
+    if (selectionActionEl && event.target instanceof Node && selectionActionEl.contains(event.target)) return;
+    hideSelectionAction();
+  });
+
+  if (toPromptBtnEl) {
+    toPromptBtnEl.addEventListener("click", () => {
+      const text = window.getSelection()?.toString().trim();
+      if (!text) return;
+      composerInputEl.value = text;
+      autoGrowTextarea();
+      composerInputEl.focus();
+      hideSelectionAction();
+    });
+  }
 }
 
 function openModal({
@@ -1456,6 +1519,7 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("beforeunload", () => closeSocket({ manual: true }));
 window.addEventListener("load", async () => {
   installTooltipSystem();
+  installSelectionAction();
   installModalSystem();
   autoGrowTextarea();
   applyChatFontSize(chatFontSizeSelectEl?.value || "default");
