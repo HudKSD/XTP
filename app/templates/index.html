@@ -53,7 +53,6 @@
 
           <div class="history-caption-row">
             <span id="historyCountPill" class="surface-chip subtle">0 chats</span>
-            <span class="history-note">Recent 10 stay visible before scrolling</span>
           </div>
 
           <div class="history-scroll">
@@ -81,14 +80,8 @@
                 >
                   Rename
                 </button>
+                <button id="toggleTerminalBtn" class="ghost-btn small" data-tooltip="Show or hide the execution console">Hide console</button>
               </div>
-              <p class="subtitle">Ask about CVEs, threat actors, malware, infrastructure, sectors, timelines, evidence, and relationships. Replies stay grounded in RBTN DB and visible tool execution.</p>
-            </div>
-
-            <div class="chat-header-actions">
-              <div class="header-chip live-pulse"><span class="chip-dot"></span>Live execution</div>
-              <button id="planModeBtn" class="ghost-btn" data-tooltip="Show or hide compact agent plan cards">Plan mode</button>
-              <button id="toggleTerminalBtn" class="ghost-btn" data-tooltip="Show or hide the execution console">Hide console</button>
             </div>
           </div>
         </header>
@@ -176,7 +169,6 @@
           <div class="pane-tabs" role="tablist" aria-label="Right pane modes">
             <button id="consoleTabBtn" class="pane-tab active" type="button" role="tab" aria-selected="true">Console</button>
             <button id="inspectorTabBtn" class="pane-tab" type="button" role="tab" aria-selected="false">Query Inspector</button>
-            <button id="artifactsTabBtn" class="pane-tab" type="button" role="tab" aria-selected="false">Artifacts</button>
           </div>
 
           <div id="consolePane" class="right-pane-mode">
@@ -198,13 +190,6 @@
             <div id="inspectorTools" class="inspector-tools"></div>
           </div>
 
-          <div id="artifactsPane" class="right-pane-mode hidden">
-            <div class="inspector-head">
-              <span class="surface-chip subtle" data-tooltip="Artifacts generated per assistant response, including exports, query snapshots, and plan summaries">Session artifacts</span>
-              <span id="artifactCountPill" class="surface-chip subtle">0 artifacts</span>
-            </div>
-            <div id="artifactList" class="artifact-list"></div>
-          </div>
         </section>
       </div>
     </aside>

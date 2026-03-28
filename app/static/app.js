@@ -19,7 +19,6 @@ const state = {
   planMode: false,
   rightPaneMode: "console",
   pendingToolEvents: [],
-  artifacts: [],
   lastUserPrompt: "",
   activity: {
     phase: "Idle",
@@ -42,20 +41,15 @@ const statusBarEl = document.getElementById("statusBar");
 const statusTextEl = document.getElementById("statusText");
 const terminalOutputEl = document.getElementById("terminalOutput");
 const toggleTerminalBtnEl = document.getElementById("toggleTerminalBtn");
-const planModeBtnEl = document.getElementById("planModeBtn");
 const clearTerminalBtnEl = document.getElementById("clearTerminalBtn");
 const consoleTabBtnEl = document.getElementById("consoleTabBtn");
 const inspectorTabBtnEl = document.getElementById("inspectorTabBtn");
-const artifactsTabBtnEl = document.getElementById("artifactsTabBtn");
 const consolePaneEl = document.getElementById("consolePane");
 const inspectorPaneEl = document.getElementById("inspectorPane");
-const artifactsPaneEl = document.getElementById("artifactsPane");
 const inspectorCountPillEl = document.getElementById("inspectorCountPill");
 const inspectorFlagsEl = document.getElementById("inspectorFlags");
 const inspectorQueryEl = document.getElementById("inspectorQuery");
 const inspectorToolsEl = document.getElementById("inspectorTools");
-const artifactListEl = document.getElementById("artifactList");
-const artifactCountPillEl = document.getElementById("artifactCountPill");
 const messageTemplate = document.getElementById("messageTemplate");
 const phaseCardEl = document.getElementById("phaseCard");
 const toolCountCardEl = document.getElementById("toolCountCard");
@@ -294,7 +288,6 @@ function setRightPaneMode(mode = "console") {
   const pairs = [
     [consoleTabBtnEl, consolePaneEl, "console"],
     [inspectorTabBtnEl, inspectorPaneEl, "inspector"],
-    [artifactsTabBtnEl, artifactsPaneEl, "artifacts"],
   ];
   pairs.forEach(([tab, pane, key]) => {
     const active = key === mode;
@@ -331,47 +324,6 @@ function updateInspector(meta = {}) {
     : `<div class="chat-history-empty">No tool trace for this response.</div>`;
   const flags = normalizeLimitations(meta, trace);
   inspectorFlagsEl.innerHTML = flags.map((flag) => `<span class="result-flag" data-tooltip="${safeEscape(flag.tip)}">${safeEscape(flag.label)}</span>`).join("");
-}
-
-function renderArtifacts() {
-  artifactCountPillEl.textContent = `${state.artifacts.length} artifact${state.artifacts.length === 1 ? "" : "s"}`;
-  if (!state.artifacts.length) {
-    artifactListEl.innerHTML = `<div class="chat-history-empty">Artifacts will appear after assistant responses.</div>`;
-    return;
-  }
-  artifactListEl.innerHTML = state.artifacts.slice().reverse().map((item) => `
-    <article class="artifact-card">
-      <div class="artifact-title">${safeEscape(item.title)}</div>
-      <div class="artifact-meta">${safeEscape(item.kind)} • ${safeEscape(fmtDate(item.created_at))}</div>
-      <button class="ghost-btn small artifact-download-btn" data-artifact-id="${safeEscape(item.id)}" type="button">Download</button>
-    </article>
-  `).join("");
-  artifactListEl.querySelectorAll(".artifact-download-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const target = state.artifacts.find((entry) => entry.id === btn.dataset.artifactId);
-      if (!target) return;
-      downloadFile(target.filename, target.content, target.mimeType);
-      showToast(`Downloaded ${target.filename}`, "success");
-    });
-  });
-}
-
-function hydrateArtifactsFromMessages(messages = []) {
-  state.artifacts = [];
-  messages.forEach((message) => {
-    if (message.role !== "assistant") return;
-    const id = `msg-${message.id || Math.random().toString(16).slice(2)}`;
-    state.artifacts.push({
-      id,
-      title: `Assistant result • ${chatTitleEl.textContent || "chat"}`,
-      kind: "chat-export",
-      created_at: message.created_at || new Date().toISOString(),
-      filename: `artifact-${id}.json`,
-      mimeType: "application/json;charset=utf-8",
-      content: JSON.stringify({ content: message.content, meta: message.meta || {} }, null, 2),
-    });
-  });
-  renderArtifacts();
 }
 
 function getTooltipAnchor(target) {
@@ -821,7 +773,19 @@ function handleCopyMessage(node, content) {
   btn.dataset.tooltip = "Copy message";
   btn.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(content || "");
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(content || "");
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = content || "";
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
       showToast("Message copied", "success");
     } catch {
       showToast("Copy failed", "error");
@@ -966,18 +930,6 @@ function replacePendingAssistant(content, meta = {}) {
   handleExportMessage(state.pendingAssistantElement, content, meta);
   decorateAssistantBubble(state.pendingAssistantElement, content, meta);
   updateInspector(meta);
-  const artifactId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const artifact = {
-    id: artifactId,
-    title: `Assistant result • ${chatTitleEl.textContent || "chat"}`,
-    kind: "chat-export",
-    created_at: new Date().toISOString(),
-    filename: `artifact-${artifactId}.json`,
-    mimeType: "application/json;charset=utf-8",
-    content: JSON.stringify({ content, meta }, null, 2),
-  };
-  state.artifacts.push(artifact);
-  renderArtifacts();
   state.pendingAssistantElement = null;
   scrollChatToBottom(true);
 }
@@ -999,6 +951,7 @@ async function api(path, options = {}) {
     try {
       data = JSON.parse(text);
     } catch {
+      if (!res.ok) throw new Error(`Request failed (${res.status}): ${text.slice(0, 180)}`);
       throw new Error(`Unexpected server response (${res.status})`);
     }
   }
@@ -1065,12 +1018,10 @@ async function switchChat(chatId) {
   if (!data.items.length) {
     showEmptyState();
     updateInspector({});
-    hydrateArtifactsFromMessages([]);
   } else {
     data.items.forEach((message) => appendMessage(message.role, message.content, message.meta || message));
     const latestAssistant = [...data.items].reverse().find((message) => message.role === "assistant");
     updateInspector(latestAssistant?.meta || {});
-    hydrateArtifactsFromMessages(data.items);
   }
   setActivityPhase("Idle");
   connectSocket(chatId);
@@ -1406,16 +1357,8 @@ toggleTerminalBtnEl.addEventListener("click", () => {
   toggleTerminalBtnEl.textContent = state.terminalVisible ? "Hide console" : "Show console";
   toggleTerminalBtnEl.dataset.tooltip = state.terminalVisible ? "Show or hide the execution console" : "Show the execution console";
 });
-planModeBtnEl.addEventListener("click", () => {
-  state.planMode = !state.planMode;
-  planModeBtnEl.classList.toggle("active", state.planMode);
-  document.querySelectorAll(".agent-plan").forEach((plan) => {
-    plan.open = state.planMode;
-  });
-});
 consoleTabBtnEl.addEventListener("click", () => setRightPaneMode("console"));
 inspectorTabBtnEl.addEventListener("click", () => setRightPaneMode("inspector"));
-artifactsTabBtnEl.addEventListener("click", () => setRightPaneMode("artifacts"));
 clearTerminalBtnEl.addEventListener("click", clearTerminal);
 composerInputEl.addEventListener("input", autoGrowTextarea);
 composerInputEl.addEventListener("keydown", (event) => {
@@ -1451,7 +1394,6 @@ window.addEventListener("load", async () => {
   installModalSystem();
   autoGrowTextarea();
   setRightPaneMode("console");
-  renderArtifacts();
   await loadHealth();
   await loadChats();
   composerInputEl.focus();
