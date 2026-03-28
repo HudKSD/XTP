@@ -796,14 +796,29 @@ function handleCopyMessage(node, content) {
 function handleExportMessage(node, content, meta = {}) {
   const btn = node.querySelector(".message-export");
   if (!btn) return;
-  btn.dataset.tooltip = "Export this response as Markdown";
+  btn.dataset.tooltip = "Export this response as MS Word (.doc)";
   btn.classList.toggle("hidden", node.classList.contains("user"));
   btn.addEventListener("click", () => {
     const title = (chatTitleEl.textContent || "chat-result").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = `${title || "chat-result"}-${stamp}.md`;
-    const body = `# ${chatTitleEl.textContent || "Chat result"}\n\n${content || ""}\n\n---\n\n\`\`\`json\n${JSON.stringify(meta || {}, null, 2)}\n\`\`\`\n`;
-    downloadFile(filename, body, "text/markdown;charset=utf-8");
+    const filename = `${title || "chat-result"}-${stamp}.doc`;
+    const bubble = node.querySelector(".message-bubble");
+    const htmlBody = bubble ? bubble.innerHTML : `<p>${safeEscape(content || "")}</p>`;
+    const payload = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:w="urn:schemas-microsoft-com:office:word"
+            xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8"><title>${safeEscape(chatTitleEl.textContent || "Chat result")}</title></head>
+      <body>
+        <h2>${safeEscape(chatTitleEl.textContent || "Chat result")}</h2>
+        ${htmlBody}
+        <hr />
+        <h3>Metadata</h3>
+        <pre>${safeEscape(JSON.stringify(meta || {}, null, 2))}</pre>
+      </body>
+      </html>
+    `;
+    downloadFile(filename, payload.trim(), "application/msword;charset=utf-8");
     showToast(`Exported ${filename}`, "success");
   });
 }
