@@ -33,6 +33,7 @@ const historySearchInputEl = document.getElementById("historySearchInput");
 const historyCountPillEl = document.getElementById("historyCountPill");
 const chatWindowEl = document.getElementById("chatWindow");
 const chatTitleEl = document.getElementById("chatTitle");
+const chatFontSizeSelectEl = document.getElementById("chatFontSizeSelect");
 const composerInputEl = document.getElementById("composerInput");
 const sendBtnEl = document.getElementById("sendBtn");
 const newChatBtnEl = document.getElementById("newChatBtn");
@@ -144,6 +145,11 @@ function scrollTerminalToBottom(force = false) {
   if (force || isNearBottom(terminalOutputEl, 140)) {
     terminalOutputEl.scrollTop = terminalOutputEl.scrollHeight;
   }
+}
+
+function applyChatFontSize(size = "default") {
+  const target = ["compact", "default", "comfortable"].includes(size) ? size : "default";
+  chatWindowEl.dataset.fontSize = target;
 }
 
 function setBusy(value) {
@@ -1408,6 +1414,12 @@ window.addEventListener("load", async () => {
   installTooltipSystem();
   installModalSystem();
   autoGrowTextarea();
+  applyChatFontSize(chatFontSizeSelectEl?.value || "default");
+  if (chatFontSizeSelectEl) {
+    chatFontSizeSelectEl.addEventListener("change", (event) => {
+      applyChatFontSize(event.target.value);
+    });
+  }
   setRightPaneMode("console");
   await loadHealth();
   await loadChats();

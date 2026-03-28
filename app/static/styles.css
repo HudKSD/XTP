@@ -802,6 +802,23 @@ textarea::placeholder,
   min-width: 0;
 }
 
+.chat-font-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.chat-font-control select {
+  min-height: 26px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-soft);
+  padding: 0 8px;
+}
+
 .title-row h2 {
   margin: 4px 0 0;
   font-size: clamp(1.22rem, 1.6vw, 1.62rem);
@@ -853,24 +870,18 @@ textarea::placeholder,
 
 .message-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
   align-items: start;
   animation: riseIn 220ms cubic-bezier(.2, .8, .2, 1);
 }
 
 .message-row.user {
-  grid-template-columns: minmax(0, 1fr) 42px;
+  justify-items: end;
 }
 
 .message-row.user .message-card {
-  grid-column: 1;
-  justify-self: end;
-  width: min(100%, 740px);
-}
-
-.message-row.user .message-avatar {
-  grid-column: 2;
+  width: min(100%, 760px);
 }
 
 .message-row.user .message-topline {
@@ -898,26 +909,7 @@ textarea::placeholder,
 }
 
 .message-avatar {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-  font-weight: 750;
-  box-shadow: var(--shadow-card);
-}
-
-.message-row.assistant .message-avatar {
-  background: linear-gradient(135deg, rgba(123, 220, 181, 0.14), rgba(101, 182, 255, 0.18));
-  border-color: rgba(123, 220, 181, 0.18);
-}
-
-.message-row.user .message-avatar {
-  background: linear-gradient(135deg, rgba(159, 140, 255, 0.16), rgba(101, 182, 255, 0.14));
-  border-color: rgba(159, 140, 255, 0.18);
+  display: none;
 }
 
 .message-topline {
@@ -952,11 +944,23 @@ textarea::placeholder,
 }
 
 .message-row.assistant .message-bubble {
-  background: linear-gradient(180deg, rgba(136, 30, 50, 0.16), rgba(255, 255, 255, 0.02));
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--text);
 }
 
 .message-row.user .message-bubble {
-  background: linear-gradient(180deg, rgba(101, 182, 255, 0.11), rgba(255, 255, 255, 0.03));
+  background: linear-gradient(180deg, rgba(101, 182, 255, 0.16), rgba(255, 255, 255, 0.04));
+  max-width: min(100%, 740px);
+}
+
+#chatWindow[data-font-size="compact"] .message-bubble {
+  font-size: 12.5px;
+}
+
+#chatWindow[data-font-size="comfortable"] .message-bubble {
+  font-size: 15px;
 }
 
 .message-bubble.is-streaming {
