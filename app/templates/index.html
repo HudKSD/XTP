@@ -10,13 +10,13 @@
   <div class="scene-glow scene-glow-a"></div>
   <div class="scene-glow scene-glow-b"></div>
 
-  <div id="appShell" class="app-shell">
+  <div id="appShell" class="app-shell workspace-mode">
     <aside class="sidebar-shell panel-card" aria-label="Conversation history">
       <div class="sidebar-stack">
         <section class="brand-panel panel-card inset-card">
           <div class="brand-topline">
             <div class="brand-mark-wrap" aria-hidden="true">
-              <div class="brand-mark">LK</div>
+              <img class="brand-logo" src="https://news.rabitanoor.com/content/images/2024/10/1-2.png" alt="RBTN logo" />
               <div class="brand-mark-ring"></div>
             </div>
             <div class="brand-copy">
@@ -24,12 +24,6 @@
               <h1>IntelChat</h1>
               <p class="brand-subtitle">Master agent for natural-language investigations over RBTN DB, with visible tools, durable history, and read-only execution.</p>
             </div>
-          </div>
-
-          <div class="brand-chips">
-            <span class="surface-chip live"><span class="chip-dot"></span>Live trace</span>
-            <span class="surface-chip">Schema-aware</span>
-            <span class="surface-chip">Read-only</span>
           </div>
 
           <div class="sidebar-actions">
@@ -46,7 +40,6 @@
               <div class="section-kicker">Conversation memory</div>
               <h2>History</h2>
             </div>
-            <div class="history-meta-pill">Grouped by date</div>
           </div>
 
           <div class="history-search-wrap">
@@ -68,10 +61,6 @@
           </div>
         </section>
 
-        <section class="sidebar-foot panel-card inset-card muted-card">
-          <div class="section-kicker">Workspace notes</div>
-          <p>Use clear analyst-style prompts for faster turns. The right-side execution console always follows the newest tool event automatically.</p>
-        </section>
       </div>
     </aside>
 
@@ -80,7 +69,7 @@
         <header class="chat-header">
           <div class="thread-rail header-rail">
             <div class="chat-header-main">
-              <div class="eyebrow">Master agent</div>
+              <div class="eyebrow"><img class="header-logo" src="https://news.rabitanoor.com/content/images/2024/10/1-2.png" alt="" /> Master agent</div>
               <div class="title-row">
                 <h2 id="chatTitle">New chat</h2>
                 <button
@@ -98,7 +87,6 @@
 
             <div class="chat-header-actions">
               <div class="header-chip live-pulse"><span class="chip-dot"></span>Live execution</div>
-              <button id="workspaceModeBtn" class="ghost-btn" data-tooltip="Toggle wider context panes for investigation mode">Workspace mode</button>
               <button id="planModeBtn" class="ghost-btn" data-tooltip="Show or hide compact agent plan cards">Plan mode</button>
               <button id="toggleTerminalBtn" class="ghost-btn" data-tooltip="Show or hide the execution console">Hide console</button>
             </div>
@@ -162,7 +150,6 @@
             <div>
               <div class="section-kicker">Operations</div>
               <h3>Execution Console</h3>
-              <p>Live tool calls, script paths, arguments, and summaries. The newest event stays visible automatically.</p>
             </div>
             <div class="activity-head-actions">
               <button id="clearTerminalBtn" class="ghost-btn small" data-tooltip="Clear the execution console">Clear</button>
@@ -170,22 +157,6 @@
           </div>
 
           <div class="activity-grid">
-            <div class="metric-card">
-              <span class="metric-label">Agent</span>
-              <strong id="agentNameCard">LidarKinesis IntelChat</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Data source</span>
-              <strong id="dbNameCard">RBTN DB</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Current index</span>
-              <strong id="indexCard">Loading…</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Access profile</span>
-              <strong id="modelCard">Read-only</strong>
-            </div>
             <div class="metric-card">
               <span class="metric-label">Current phase</span>
               <strong id="phaseCard">Idle</strong>

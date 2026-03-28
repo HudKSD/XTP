@@ -257,6 +257,15 @@ textarea:disabled {
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
 }
 
+.brand-logo {
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
 .brand-mark-ring {
   position: absolute;
   inset: -8px;
@@ -800,6 +809,15 @@ textarea::placeholder,
   opacity: 0.78;
 }
 
+.header-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
 .chat-header-actions {
   justify-content: flex-end;
   align-items: center;
@@ -981,9 +999,13 @@ textarea::placeholder,
 .message-bubble h2,
 .message-bubble h3,
 .message-bubble h4 {
-  margin: 0 0 12px;
+  margin: 18px 0 12px;
   color: var(--text);
   line-height: 1.2;
+}
+
+.message-bubble > :first-child:is(h1, h2, h3, h4) {
+  margin-top: 0;
 }
 
 .message-bubble h1 {
@@ -1255,7 +1277,7 @@ textarea::placeholder,
 }
 
 .activity-head {
-  padding: 16px;
+  padding: 12px;
 }
 
 .activity-topline {
@@ -1274,24 +1296,24 @@ textarea::placeholder,
 
 .activity-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .metric-card {
-  padding: 12px 13px;
-  border-radius: 16px;
+  padding: 8px 9px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
 }
 
 .metric-card strong {
   display: block;
-  margin-top: 6px;
-  font-size: 0.96rem;
+  margin-top: 3px;
+  font-size: 0.8rem;
   color: var(--text);
-  line-height: 1.45;
+  line-height: 1.35;
 }
 
 .metric-wide {

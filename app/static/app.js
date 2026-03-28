@@ -16,7 +16,6 @@ const state = {
   modalResolver: null,
   modalMode: null,
   historyFilter: "",
-  workspaceMode: false,
   planMode: false,
   rightPaneMode: "console",
   pendingToolEvents: [],
@@ -43,7 +42,6 @@ const statusBarEl = document.getElementById("statusBar");
 const statusTextEl = document.getElementById("statusText");
 const terminalOutputEl = document.getElementById("terminalOutput");
 const toggleTerminalBtnEl = document.getElementById("toggleTerminalBtn");
-const workspaceModeBtnEl = document.getElementById("workspaceModeBtn");
 const planModeBtnEl = document.getElementById("planModeBtn");
 const clearTerminalBtnEl = document.getElementById("clearTerminalBtn");
 const consoleTabBtnEl = document.getElementById("consoleTabBtn");
@@ -59,8 +57,6 @@ const inspectorToolsEl = document.getElementById("inspectorTools");
 const artifactListEl = document.getElementById("artifactList");
 const artifactCountPillEl = document.getElementById("artifactCountPill");
 const messageTemplate = document.getElementById("messageTemplate");
-const modelCardEl = document.getElementById("modelCard");
-const indexCardEl = document.getElementById("indexCard");
 const phaseCardEl = document.getElementById("phaseCard");
 const toolCountCardEl = document.getElementById("toolCountCard");
 const lastEventCardEl = document.getElementById("lastEventCard");
@@ -224,7 +220,7 @@ function buildFollowups(prompt = "", response = "") {
   const text = `${prompt}\n${response}`.toLowerCase();
   const picks = [];
   const push = (value) => {
-    if (value && !picks.includes(value) && picks.length < 5) picks.push(value);
+    if (value && !picks.includes(value) && picks.length < 6) picks.push(value);
   };
   if (text.includes("cve")) push("Can you break this down by CVE severity and affected products?");
   if (text.includes("threat actor")) push("Which threat actors showed the largest increase over the same period?");
@@ -237,7 +233,7 @@ function buildFollowups(prompt = "", response = "") {
   push("What evidence rows most strongly support this conclusion?");
   push("Can you validate this with an ES|QL query and show the exact query used?");
   push("What gaps or uncertainty should we account for before acting on this?");
-  return picks.slice(0, 5);
+  return picks.slice(0, 6);
 }
 
 function sanitizeSuggestionText(value = "") {
@@ -279,7 +275,7 @@ function extractAnswerSuggestions(content = "") {
     .slice(0, 8)
     .forEach(push);
 
-  return picks.slice(0, 5);
+  return picks.slice(0, 6);
 }
 
 function derivePlan(meta = {}) {
@@ -889,7 +885,7 @@ function decorateAssistantBubble(node, content = "", meta = {}) {
     : [];
   const answerFollowups = extractAnswerSuggestions(content);
   const followups = modelFollowups.length
-    ? modelFollowups.slice(0, 5)
+    ? modelFollowups.slice(0, 6)
     : answerFollowups;
   if (followups.length) {
     followupsWrap.classList.remove("hidden");
@@ -1013,11 +1009,12 @@ async function api(path, options = {}) {
 async function loadHealth() {
   try {
     const data = await api("/api/health");
-    modelCardEl.textContent = "Read-only";
-    indexCardEl.textContent = data.default_index || "Not set";
+    const indexChip = document.getElementById("lastEventCard");
+    if (indexChip && data.default_index) {
+      indexChip.dataset.tooltip = `Current default index: ${data.default_index}`;
+    }
     setLastEvent("Workspace ready");
   } catch (err) {
-    indexCardEl.textContent = "Unavailable";
     terminalLine(`Health check failed: ${err.message}`, "error", "health");
     showToast("Workspace health check failed", "error");
   }
@@ -1408,11 +1405,6 @@ toggleTerminalBtnEl.addEventListener("click", () => {
   shellEl.classList.toggle("console-hidden", !state.terminalVisible);
   toggleTerminalBtnEl.textContent = state.terminalVisible ? "Hide console" : "Show console";
   toggleTerminalBtnEl.dataset.tooltip = state.terminalVisible ? "Show or hide the execution console" : "Show the execution console";
-});
-workspaceModeBtnEl.addEventListener("click", () => {
-  state.workspaceMode = !state.workspaceMode;
-  shellEl.classList.toggle("workspace-mode", state.workspaceMode);
-  workspaceModeBtnEl.classList.toggle("active", state.workspaceMode);
 });
 planModeBtnEl.addEventListener("click", () => {
   state.planMode = !state.planMode;

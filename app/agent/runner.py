@@ -406,13 +406,14 @@ class ElasticAgent:
     ) -> list[str]:
         tools_used = [entry.get("tool_name") for entry in tool_trace if entry.get("tool_name")]
         prompt = (
-            "Generate exactly 5 concise, actionable follow-up prompts for a cybersecurity threat hunter.\n"
+            "Generate exactly 6 concise, actionable follow-up prompt questions for a cybersecurity threat hunter.\n"
             "Requirements:\n"
             "- Must be specific to the user request and assistant answer.\n"
             "- Must be pivot-oriented (next investigative steps on IOC, actor, malware, infra, timeline, or sector).\n"
             "- Must avoid generic wording and avoid markdown symbols (*, **, backticks).\n"
+            "- Every follow-up must be a standalone question sentence ending with '?'.\n"
             "- Each prompt must be a single line under 110 characters.\n"
-            "- Return JSON only: {\"followups\":[\"...\",\"...\",\"...\",\"...\",\"...\"]}\n\n"
+            "- Return JSON only: {\"followups\":[\"...\",\"...\",\"...\",\"...\",\"...\",\"...\"]}\n\n"
             f"User request:\n{latest_user_message}\n\n"
             f"Assistant answer:\n{assistant_answer}\n\n"
             f"Tools used:\n{', '.join(tools_used) if tools_used else 'none'}"
@@ -434,7 +435,7 @@ class ElasticAgent:
                 text = _clean_followup_text(str(value or ""))
                 if text and text not in cleaned:
                     cleaned.append(text[:110])
-                if len(cleaned) >= 5:
+                if len(cleaned) >= 6:
                     break
             return cleaned
         except Exception:
@@ -509,6 +510,8 @@ def _clean_followup_text(value: str) -> str:
     text = re.sub(r"(^|\W)_([^_]+)_(?=\W|$)", r"\1\2", text)
     text = re.sub(r"^[-*•\d.)\s]+", "", text)
     text = re.sub(r"\s+", " ", text).strip()
+    if text and not text.endswith("?"):
+        text = text.rstrip(".!:;") + "?"
     return text
 
 
