@@ -197,13 +197,6 @@ class ElasticAgent:
                             "For validate_dsl_query and run_dsl_query, always send a full query_body object."
                         ),
                     }
-                    await emit(
-                        "error",
-                        {
-                            "message": str(exc),
-                            "tool_name": tool_name,
-                        },
-                    )
                     self.trace_logger.write(
                         chat_id,
                         {
