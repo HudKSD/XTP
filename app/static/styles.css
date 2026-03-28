@@ -714,16 +714,18 @@ textarea::placeholder,
   overflow: hidden;
   min-height: calc(1.35em * 2);
   margin-bottom: 8px;
-  font-weight: 630;
+  font-weight: 500;
   line-height: 1.35;
-  color: var(--text);
+  color: var(--text-soft);
 }
 
 .chat-item-time-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 11px;
+  color: var(--text-faint);
+  opacity: 0.86;
 }
 
 .chat-item-actions {
