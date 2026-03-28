@@ -148,8 +148,9 @@ function scrollTerminalToBottom(force = false) {
 }
 
 function applyChatFontSize(size = "default") {
-  const target = ["compact", "default", "comfortable"].includes(size) ? size : "default";
-  chatWindowEl.dataset.fontSize = target;
+  const numeric = Number.parseInt(String(size || "13"), 10);
+  const target = Number.isFinite(numeric) ? Math.min(16, Math.max(5, numeric)) : 13;
+  chatWindowEl.style.setProperty("--chat-font-size", `${target}px`);
 }
 
 function setBusy(value) {
@@ -816,11 +817,7 @@ function handleExportMessage(node, content, meta = {}) {
             xmlns="http://www.w3.org/TR/REC-html40">
       <head><meta charset="utf-8"><title>${safeEscape(chatTitleEl.textContent || "Chat result")}</title></head>
       <body>
-        <h2>${safeEscape(chatTitleEl.textContent || "Chat result")}</h2>
         ${htmlBody}
-        <hr />
-        <h3>Metadata</h3>
-        <pre>${safeEscape(JSON.stringify(meta || {}, null, 2))}</pre>
       </body>
       </html>
     `;

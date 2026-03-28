@@ -814,9 +814,14 @@ textarea::placeholder,
   min-height: 26px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-soft);
+  background: #0b0d11;
+  color: #f4f7fb;
   padding: 0 8px;
+}
+
+.chat-font-control select option {
+  background: #0b0d11;
+  color: #f4f7fb;
 }
 
 .title-row h2 {
@@ -881,7 +886,8 @@ textarea::placeholder,
 }
 
 .message-row.user .message-card {
-  width: min(100%, 760px);
+  width: fit-content;
+  max-width: min(100%, 760px);
 }
 
 .message-row.user .message-topline {
@@ -940,7 +946,7 @@ textarea::placeholder,
   padding: 16px 16px 14px;
   color: var(--text-soft);
   line-height: 1.65;
-  font-size: 13.5px;
+  font-size: var(--chat-font-size, 13px);
 }
 
 .message-row.assistant .message-bubble {
@@ -952,15 +958,8 @@ textarea::placeholder,
 
 .message-row.user .message-bubble {
   background: linear-gradient(180deg, rgba(101, 182, 255, 0.16), rgba(255, 255, 255, 0.04));
+  width: fit-content;
   max-width: min(100%, 740px);
-}
-
-#chatWindow[data-font-size="compact"] .message-bubble {
-  font-size: 12.5px;
-}
-
-#chatWindow[data-font-size="comfortable"] .message-bubble {
-  font-size: 15px;
 }
 
 .message-bubble.is-streaming {
