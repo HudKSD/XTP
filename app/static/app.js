@@ -706,6 +706,21 @@ function renderChats() {
       const actions = document.createElement("div");
       actions.className = "chat-item-actions";
 
+      const exportBtn = document.createElement("button");
+      exportBtn.type = "button";
+      exportBtn.className = "chat-action-btn icon-only";
+      exportBtn.textContent = "⬇";
+      exportBtn.setAttribute("aria-label", `Export ${chat.title || "New chat"}`);
+      exportBtn.dataset.tooltip = `Export “${chat.title || "New chat"}”`;
+      exportBtn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        try {
+          await exportChatTranscript(chat.id, chat.title || "chat");
+        } catch (err) {
+          showToast(`Export failed: ${err.message}`, "error");
+        }
+      });
+
       const renameBtn = document.createElement("button");
       renameBtn.type = "button";
       renameBtn.className = "chat-action-btn icon-only";
@@ -728,7 +743,7 @@ function renderChats() {
         deleteChat(chat.id, chat.title || "New chat");
       });
 
-      actions.append(renameBtn, deleteBtn);
+      actions.append(exportBtn, renameBtn, deleteBtn);
       shell.append(mainBtn, actions);
       list.appendChild(shell);
     });
@@ -736,6 +751,29 @@ function renderChats() {
     section.appendChild(list);
     chatListEl.appendChild(section);
   });
+}
+
+async function exportChatTranscript(chatId, title = "chat") {
+  const data = await api(`/api/chats/${chatId}/messages`);
+  const parts = (data.items || []).map((message) => {
+    const role = message.role === "user" ? "Prompt" : "Response";
+    return `<h3>${role}</h3><p>${safeEscape(message.content || "").replace(/\n/g, "<br/>")}</p>`;
+  });
+  const slug = (title || "chat").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const filename = `${slug || "chat"}-${new Date().toISOString().replace(/[:.]/g, "-")}.doc`;
+  const payload = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:w="urn:schemas-microsoft-com:office:word"
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="utf-8"><title>${safeEscape(title || "Chat transcript")}</title></head>
+    <body>
+      <h2>${safeEscape(title || "Chat transcript")}</h2>
+      ${parts.join("<hr/>")}
+    </body>
+    </html>
+  `;
+  downloadFile(filename, payload.trim(), "application/msword;charset=utf-8");
+  showToast(`Exported ${filename}`, "success");
 }
 
 function showEmptyState() {
@@ -810,13 +848,22 @@ function handleExportMessage(node, content, meta = {}) {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const filename = `${title || "chat-result"}-${stamp}.doc`;
     const bubble = node.querySelector(".message-bubble");
-    const htmlBody = bubble ? bubble.innerHTML : `<p>${safeEscape(content || "")}</p>`;
+    let htmlBody = `<p>${safeEscape(content || "")}</p>`;
+    if (bubble) {
+      const clone = bubble.cloneNode(true);
+      clone.querySelectorAll(".message-tools, .message-flags, .agent-plan").forEach((el) => el.remove());
+      htmlBody = clone.innerHTML;
+    }
+    const promptText = node.previousElementSibling?.classList?.contains("user")
+      ? node.previousElementSibling.querySelector(".message-bubble")?.innerText?.trim()
+      : "";
     const payload = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office"
             xmlns:w="urn:schemas-microsoft-com:office:word"
             xmlns="http://www.w3.org/TR/REC-html40">
       <head><meta charset="utf-8"><title>${safeEscape(chatTitleEl.textContent || "Chat result")}</title></head>
       <body>
+        ${promptText ? `<h3>Prompt</h3><p>${safeEscape(promptText)}</p><hr/>` : ""}
         ${htmlBody}
       </body>
       </html>
