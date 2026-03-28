@@ -406,10 +406,11 @@ class ElasticAgent:
     ) -> list[str]:
         tools_used = [entry.get("tool_name") for entry in tool_trace if entry.get("tool_name")]
         prompt = (
-            "Generate exactly 5 concise, actionable follow-up prompts for a cybersecurity analyst.\n"
+            "Generate exactly 5 concise, actionable follow-up prompts for a cybersecurity threat hunter.\n"
             "Requirements:\n"
             "- Must be specific to the user request and assistant answer.\n"
-            "- Must avoid generic wording.\n"
+            "- Must be pivot-oriented (next investigative steps on IOC, actor, malware, infra, timeline, or sector).\n"
+            "- Must avoid generic wording and avoid markdown symbols (*, **, backticks).\n"
             "- Each prompt must be a single line under 110 characters.\n"
             "- Return JSON only: {\"followups\":[\"...\",\"...\",\"...\",\"...\",\"...\"]}\n\n"
             f"User request:\n{latest_user_message}\n\n"
@@ -430,7 +431,7 @@ class ElasticAgent:
                 return []
             cleaned: list[str] = []
             for value in items:
-                text = str(value or "").strip()
+                text = _clean_followup_text(str(value or ""))
                 if text and text not in cleaned:
                     cleaned.append(text[:110])
                 if len(cleaned) >= 5:
@@ -497,6 +498,18 @@ def _parse_followups_payload(raw: str) -> list[str] | None:
         except Exception:
             pass
     return None
+
+
+def _clean_followup_text(value: str) -> str:
+    text = (value or "").strip()
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = re.sub(r"__([^_]+)__", r"\1", text)
+    text = re.sub(r"(^|\W)\*([^*]+)\*(?=\W|$)", r"\1\2", text)
+    text = re.sub(r"(^|\W)_([^_]+)_(?=\W|$)", r"\1\2", text)
+    text = re.sub(r"^[-*•\d.)\s]+", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 
 

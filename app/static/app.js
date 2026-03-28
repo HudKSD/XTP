@@ -240,15 +240,25 @@ function buildFollowups(prompt = "", response = "") {
   return picks.slice(0, 5);
 }
 
+function sanitizeSuggestionText(value = "") {
+  return String(value || "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/(^|\W)\*([^*]+)\*(?=\W|$)/g, "$1$2")
+    .replace(/(^|\W)_([^_]+)_(?=\W|$)/g, "$1$2")
+    .replace(/^[-*•\d.)\s]+/, "")
+    .replace(/,\s*or\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 110);
+}
+
 function extractAnswerSuggestions(content = "") {
   const text = String(content || "");
   const picks = [];
   const push = (value) => {
-    const cleaned = value
-      .replace(/^[-*•\d.)\s]+/, "")
-      .replace(/,\s*or\s*$/i, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    const cleaned = sanitizeSuggestionText(value);
     if (cleaned && cleaned.length > 6 && !picks.includes(cleaned)) picks.push(cleaned.slice(0, 110));
   };
 
@@ -872,7 +882,11 @@ function decorateAssistantBubble(node, content = "", meta = {}) {
 
   const followupsWrap = node.querySelector(".message-followups");
   followupsWrap.innerHTML = "";
-  const modelFollowups = Array.isArray(meta.followups) ? meta.followups.map((item) => String(item || "").trim()).filter(Boolean) : [];
+  const modelFollowups = Array.isArray(meta.followups)
+    ? meta.followups
+      .map((item) => sanitizeSuggestionText(String(item || "")))
+      .filter(Boolean)
+    : [];
   const answerFollowups = extractAnswerSuggestions(content);
   const followups = modelFollowups.length
     ? modelFollowups.slice(0, 5)
