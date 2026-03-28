@@ -68,7 +68,8 @@ def test_esql_sanitizer() -> None:
     assert_true("30 days" in sanitized.lower(), "interval syntax should be rewritten")
     assert_true('LIKE "*AI*"' in sanitized, "LIKE wildcards should be rewritten")
     assert_true(re.search(r"\|\s*LIMIT\s+100\b", sanitized, flags=re.IGNORECASE) is not None, "limit should be capped")
-    assert_true(any("unmapped_fields" in warning for warning in warnings), "should add unmapped_fields directive")
+    assert_true(not sanitized.lower().startswith("set "), "sanitizer should stay compatible with clusters that reject SET preambles")
+    assert_true(bool(warnings), "sanitizer should emit at least one warning when rewrites occur")
 
 
 def test_template_contract() -> None:

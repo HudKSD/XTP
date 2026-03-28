@@ -197,13 +197,6 @@ class ElasticAgent:
                             "For validate_dsl_query and run_dsl_query, always send a full query_body object."
                         ),
                     }
-                    await emit(
-                        "error",
-                        {
-                            "message": str(exc),
-                            "tool_name": tool_name,
-                        },
-                    )
                     self.trace_logger.write(
                         chat_id,
                         {
@@ -234,6 +227,8 @@ class ElasticAgent:
                         "tool_name": tool_name,
                         "arguments": args,
                         "summary": result.get("summary") or result.get("message") or ("error" if not result.get("ok", True) else "ok"),
+                        "limitations": self._extract_limitations(tool_name, result),
+                        "query_preview": self._extract_query_preview(tool_name, args, result),
                     }
                 )
                 outputs_for_model.append(
@@ -317,6 +312,31 @@ class ElasticAgent:
 
     def _fingerprint_tool_call(self, tool_name: str, args: dict[str, Any]) -> str:
         return f"{tool_name}::{json.dumps(args, sort_keys=True, ensure_ascii=False, default=str)}"
+
+    def _extract_query_preview(self, tool_name: str, args: dict[str, Any], result: dict[str, Any]) -> str:
+        if tool_name == "run_esql_query":
+            return str(result.get("query") or args.get("query") or "")
+        if tool_name in {"run_dsl_query", "validate_dsl_query"}:
+            body = result.get("query_body") or args.get("query_body")
+            if isinstance(body, dict):
+                return json.dumps(body, ensure_ascii=False, default=str)
+        return ""
+
+    def _extract_limitations(self, tool_name: str, result: dict[str, Any]) -> list[str]:
+        flags: list[str] = []
+        row_count = result.get("row_count")
+        if tool_name == "run_esql_query" and isinstance(row_count, int):
+            if row_count >= 100:
+                flags.append("truncated")
+                flags.append("sampled")
+        warnings = result.get("warnings") or []
+        if isinstance(warnings, list):
+            warning_text = " ".join(str(item).lower() for item in warnings)
+            if "unmapped" in warning_text or "conflict" in warning_text or "type" in warning_text:
+                flags.append("schema_conflict")
+            if "limit" in warning_text:
+                flags.append("truncated")
+        return sorted(set(flags))
 
     async def _force_finalize(
         self,

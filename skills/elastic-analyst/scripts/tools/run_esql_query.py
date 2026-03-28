@@ -92,19 +92,10 @@ def _rewrite_like_wildcards(query: str) -> tuple[str, list[str]]:
     return rewritten, warnings
 
 
-def _ensure_unmapped_fields_directive(query: str) -> tuple[str, list[str]]:
-    warnings: list[str] = []
-    lowered = query.lstrip().lower()
-    if lowered.startswith("set ") and "unmapped_fields" in lowered.split(";", 1)[0]:
-        return query, warnings
-    warnings.append('Added ES|QL directive SET unmapped_fields="nullify" to reduce failures on optional fields.')
-    return 'SET unmapped_fields="nullify";\n' + query.lstrip(), warnings
-
-
 def sanitize_query(query: str) -> tuple[str, list[str]]:
     warnings: list[str] = []
     sanitized = query.strip()
-    for fn in (_rewrite_sql_interval_syntax, _rewrite_like_wildcards, _ensure_unmapped_fields_directive):
+    for fn in (_rewrite_sql_interval_syntax, _rewrite_like_wildcards):
         sanitized, extra = fn(sanitized)
         warnings.extend(extra)
     sanitized, limit_warnings = ensure_limit(sanitized)
